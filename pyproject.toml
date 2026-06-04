@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "agenticrag"
+version = "0.1.0"
+description = "Research package: agentic RAG pipeline failure diagnosis and benchmarking"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "pydantic",
+    "rich",
+    "tqdm",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
