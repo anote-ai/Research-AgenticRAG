@@ -1,5 +1,6 @@
 from .core import (
     FailureStage,
+    FailureType,
     PipelineTrace,
     FailureRecord,
     DiagnosticBenchmark,
@@ -18,11 +19,17 @@ from .evaluate import (
     retrieval_loop_efficiency,
     mean_hops_per_trace,
     hop_doc_coverage,
+    failure_amplification_rate,
+    recovery_rate,
 )
 from .data import make_trace, make_dataset, make_multi_hop_trace, build_knowledge_graph, make_multi_hop_corpus
+from .retrievers import BM25Retriever, TokenOverlapRetriever
+from .datasets import QASample, load_hotpotqa, load_musique, load_dataset, iter_batches
 
 __all__ = [
+    # Core models
     "FailureStage",
+    "FailureType",
     "PipelineTrace",
     "FailureRecord",
     "DiagnosticBenchmark",
@@ -30,6 +37,7 @@ __all__ = [
     "KnowledgeGraph",
     "AgenticRAGPipeline",
     "reformulate_query",
+    # Evaluation metrics
     "stage_attribution_rate",
     "propagation_rate",
     "failure_confusion_matrix",
@@ -39,9 +47,21 @@ __all__ = [
     "retrieval_loop_efficiency",
     "mean_hops_per_trace",
     "hop_doc_coverage",
+    "failure_amplification_rate",
+    "recovery_rate",
+    # Synthetic data
     "make_trace",
     "make_dataset",
     "make_multi_hop_trace",
     "build_knowledge_graph",
     "make_multi_hop_corpus",
+    # Retrievers
+    "BM25Retriever",
+    "TokenOverlapRetriever",
+    # Dataset adapters
+    "QASample",
+    "load_hotpotqa",
+    "load_musique",
+    "load_dataset",
+    "iter_batches",
 ]

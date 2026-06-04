@@ -90,15 +90,16 @@ def test_diagnose_trace_empty_answer():
 
 def test_diagnose_trace_success():
     bench = DiagnosticBenchmark()
+    # Answer must share tokens with retrieved doc to avoid hallucination detection.
     trace = PipelineTrace(
         trace_id="t4",
         query="q",
-        retrieved_docs=["doc1"],
+        retrieved_docs=["CompanyA revenue was 500 million in fiscal year 2023."],
         tool_calls=[{"name": "search"}],
-        final_answer="correct",
-        reference_answer="correct",
+        final_answer="CompanyA revenue was 500 million.",
+        reference_answer="CompanyA revenue was 500 million.",
     )
-    record = bench.diagnose_trace(trace, {"answer": "correct"})
+    record = bench.diagnose_trace(trace, {"answer": "CompanyA revenue was 500 million."})
     assert record.stage == FailureStage.NONE
     assert record.failure_type == "success"
 
