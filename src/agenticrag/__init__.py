@@ -3,6 +3,10 @@ from .core import (
     PipelineTrace,
     FailureRecord,
     DiagnosticBenchmark,
+    KnowledgeNode,
+    KnowledgeGraph,
+    AgenticRAGPipeline,
+    reformulate_query,
 )
 from .evaluate import (
     stage_attribution_rate,
@@ -10,19 +14,34 @@ from .evaluate import (
     failure_confusion_matrix,
     end_to_end_accuracy,
     severity_weighted_failure_rate,
+    multi_hop_accuracy,
+    retrieval_loop_efficiency,
+    mean_hops_per_trace,
+    hop_doc_coverage,
 )
-from .data import make_trace, make_dataset
+from .data import make_trace, make_dataset, make_multi_hop_trace, build_knowledge_graph, make_multi_hop_corpus
 
 __all__ = [
     "FailureStage",
     "PipelineTrace",
     "FailureRecord",
     "DiagnosticBenchmark",
+    "KnowledgeNode",
+    "KnowledgeGraph",
+    "AgenticRAGPipeline",
+    "reformulate_query",
     "stage_attribution_rate",
     "propagation_rate",
     "failure_confusion_matrix",
     "end_to_end_accuracy",
     "severity_weighted_failure_rate",
+    "multi_hop_accuracy",
+    "retrieval_loop_efficiency",
+    "mean_hops_per_trace",
+    "hop_doc_coverage",
     "make_trace",
     "make_dataset",
+    "make_multi_hop_trace",
+    "build_knowledge_graph",
+    "make_multi_hop_corpus",
 ]
