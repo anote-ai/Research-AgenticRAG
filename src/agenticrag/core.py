@@ -14,6 +14,22 @@ class FailureStage(str, Enum):
     NONE = "none"
 
 
+class FailureType(str, Enum):
+    # Retrieval stage
+    EMPTY_RETRIEVAL = "empty_retrieval"
+    # Tool call stage
+    NO_TOOL_CALLS = "no_tool_calls"
+    # Answer generation stage
+    EMPTY_ANSWER = "empty_answer"
+    INCORRECT_ANSWER = "incorrect_answer"
+    HALLUCINATION = "hallucination"       # answer not grounded in retrieved docs
+    # Multi-hop / loop failures
+    OVER_RETRIEVAL = "over_retrieval"     # exhausted iteration budget without satisfying query
+    CONTEXT_OVERFLOW = "context_overflow" # retrieved docs exceed context window
+    # No failure
+    SUCCESS = "success"
+
+
 class PipelineTrace(BaseModel):
     trace_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     query: str
@@ -172,14 +188,21 @@ class AgenticRAGPipeline:
 class DiagnosticBenchmark:
     """Diagnose pipeline traces and attribute failures."""
 
+    # Tokens that must appear in retrieved docs for an answer to be grounded.
+    # An answer is considered hallucinated when none of its content words appear
+    # in any retrieved document.
+    _MIN_GROUNDING_OVERLAP = 0.05
+
     def diagnose_trace(
         self, trace: PipelineTrace, reference: Dict[str, Any]
     ) -> FailureRecord:
+        max_iter = reference.get("max_iterations", 3)
+
         if not trace.retrieved_docs:
             return FailureRecord(
                 trace_id=trace.trace_id,
                 stage=FailureStage.RETRIEVAL,
-                failure_type="empty_retrieval",
+                failure_type=FailureType.EMPTY_RETRIEVAL,
                 propagated=True,
                 root_cause="No documents retrieved",
                 severity=0.9,
@@ -188,25 +211,44 @@ class DiagnosticBenchmark:
             return FailureRecord(
                 trace_id=trace.trace_id,
                 stage=FailureStage.TOOL_CALL,
-                failure_type="no_tool_calls",
+                failure_type=FailureType.NO_TOOL_CALLS,
                 propagated=True,
                 root_cause="No tool calls made",
                 severity=0.7,
+            )
+        elif trace.iterations_used >= max_iter and trace.final_answer.strip() == "":
+            # Exhausted the hop budget without producing an answer
+            return FailureRecord(
+                trace_id=trace.trace_id,
+                stage=FailureStage.RETRIEVAL,
+                failure_type=FailureType.OVER_RETRIEVAL,
+                propagated=True,
+                root_cause="Iteration budget exhausted without a satisfying answer",
+                severity=0.75,
             )
         elif trace.final_answer.strip() == "":
             return FailureRecord(
                 trace_id=trace.trace_id,
                 stage=FailureStage.ANSWER_GENERATION,
-                failure_type="empty_answer",
+                failure_type=FailureType.EMPTY_ANSWER,
                 propagated=False,
                 root_cause="Answer generation produced empty string",
                 severity=0.8,
+            )
+        elif self._is_hallucination(trace):
+            return FailureRecord(
+                trace_id=trace.trace_id,
+                stage=FailureStage.ANSWER_GENERATION,
+                failure_type=FailureType.HALLUCINATION,
+                propagated=False,
+                root_cause="Answer not grounded in retrieved documents",
+                severity=0.65,
             )
         elif trace.final_answer != reference.get("answer", ""):
             return FailureRecord(
                 trace_id=trace.trace_id,
                 stage=FailureStage.ANSWER_GENERATION,
-                failure_type="incorrect_answer",
+                failure_type=FailureType.INCORRECT_ANSWER,
                 propagated=False,
                 root_cause="Answer does not match reference",
                 severity=0.5,
@@ -215,11 +257,18 @@ class DiagnosticBenchmark:
             return FailureRecord(
                 trace_id=trace.trace_id,
                 stage=FailureStage.NONE,
-                failure_type="success",
+                failure_type=FailureType.SUCCESS,
                 propagated=False,
                 root_cause="",
                 severity=0.0,
             )
+
+    def _is_hallucination(self, trace: PipelineTrace) -> bool:
+        """Return True when the answer has near-zero overlap with retrieved docs."""
+        if not trace.final_answer.strip() or not trace.retrieved_docs:
+            return False
+        corpus_text = " ".join(trace.retrieved_docs)
+        return _token_overlap(trace.final_answer, corpus_text) < self._MIN_GROUNDING_OVERLAP
 
     def batch_diagnose(
         self,

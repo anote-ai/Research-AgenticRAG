@@ -3,3 +3,6 @@ pandas
 pydantic
 rich
 tqdm
+rank-bm25
+datasets
+sentence-transformers
