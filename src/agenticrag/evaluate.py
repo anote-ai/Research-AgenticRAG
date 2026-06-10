@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Sequence
 
 from .core import FailureRecord, FailureStage, PipelineTrace
 
@@ -42,11 +42,72 @@ def failure_confusion_matrix(
     return result
 
 
+def root_cause_stage(record: FailureRecord) -> FailureStage:
+    """Return the predicted root-cause stage for a failure record.
+
+    FailureRecord.root_cause is currently a free-form string in some diagnostic
+    paths. When it stores a canonical stage value, use it. Otherwise fall back
+    to the record's attributed stage.
+    """
+    try:
+        return FailureStage(record.root_cause)
+    except ValueError:
+        return record.stage
+
+
+def root_cause_accuracy(
+    predicted_records: Sequence[FailureRecord],
+    true_root_causes: Sequence[FailureRecord | FailureStage | str],
+    include_success: bool = True,
+) -> float:
+    """Fraction of records where the earliest failing stage is identified.
+
+    Parameters
+    ----------
+    predicted_records:
+        Diagnostic output whose root cause should be scored.
+    true_root_causes:
+        Ground-truth root causes as FailureRecords, FailureStage values, or
+        canonical stage strings.
+    include_success:
+        Whether successful traces (stage == NONE) count in the denominator.
+    """
+    if len(predicted_records) != len(true_root_causes):
+        raise ValueError(
+            "predicted_records and true_root_causes must have the same length"
+        )
+
+    pairs = [
+        (root_cause_stage(predicted), _coerce_root_cause_stage(true))
+        for predicted, true in zip(predicted_records, true_root_causes)
+    ]
+    if not include_success:
+        pairs = [
+            (predicted, true)
+            for predicted, true in pairs
+            if true != FailureStage.NONE
+        ]
+
+    if not pairs:
+        return 0.0
+
+    correct = sum(1 for predicted, true in pairs if predicted == true)
+    return correct / len(pairs)
+
+
 def end_to_end_accuracy(records: List[FailureRecord]) -> float:
     """Fraction of records where stage == NONE (i.e., successful)."""
     if not records:
         return 0.0
     return sum(1 for r in records if r.stage == FailureStage.NONE) / len(records)
+
+
+def _coerce_root_cause_stage(value: FailureRecord | FailureStage | str) -> FailureStage:
+    if isinstance(value, FailureRecord):
+        return root_cause_stage(value)
+    if isinstance(value, FailureStage):
+        return value
+    return FailureStage(value)
 
 
 def severity_weighted_failure_rate(records: List[FailureRecord]) -> float:

@@ -12,6 +12,8 @@ from agenticrag.evaluate import (
     end_to_end_accuracy,
     severity_weighted_failure_rate,
     failure_confusion_matrix,
+    root_cause_accuracy,
+    root_cause_stage,
 )
 
 
@@ -66,6 +68,99 @@ def test_failure_confusion_matrix_structure():
     assert "tp" in cm["retrieval"]
     assert "fp" in cm["retrieval"]
     assert "fn" in cm["retrieval"]
+
+
+def test_root_cause_stage_uses_canonical_root_cause_string():
+    record = FailureRecord(
+        trace_id="t1",
+        stage=FailureStage.ANSWER_GENERATION,
+        failure_type="empty_retrieval",
+        propagated=True,
+        root_cause="retrieval",
+    )
+
+    assert root_cause_stage(record) == FailureStage.RETRIEVAL
+
+
+def test_root_cause_stage_falls_back_to_record_stage_for_descriptive_text():
+    record = FailureRecord(
+        trace_id="t1",
+        stage=FailureStage.TOOL_CALL,
+        failure_type="no_tool_calls",
+        propagated=True,
+        root_cause="No tool calls made",
+    )
+
+    assert root_cause_stage(record) == FailureStage.TOOL_CALL
+
+
+def test_root_cause_accuracy_scores_stage_values():
+    records = [
+        FailureRecord(
+            trace_id="t1",
+            stage=FailureStage.ANSWER_GENERATION,
+            failure_type="empty_retrieval",
+            propagated=True,
+            root_cause="retrieval",
+        ),
+        FailureRecord(
+            trace_id="t2",
+            stage=FailureStage.ANSWER_GENERATION,
+            failure_type="empty_answer",
+            propagated=False,
+            root_cause="answer_generation",
+        ),
+        FailureRecord(
+            trace_id="t3",
+            stage=FailureStage.TOOL_CALL,
+            failure_type="no_tool_calls",
+            propagated=True,
+            root_cause="tool_call",
+        ),
+    ]
+
+    acc = root_cause_accuracy(
+        records,
+        [
+            FailureStage.RETRIEVAL,
+            FailureStage.ANSWER_GENERATION,
+            FailureStage.RETRIEVAL,
+        ],
+    )
+
+    assert abs(acc - 2 / 3) < 1e-9
+
+
+def test_root_cause_accuracy_can_exclude_successes():
+    records = [
+        FailureRecord(
+            trace_id="t1",
+            stage=FailureStage.NONE,
+            failure_type="success",
+        ),
+        FailureRecord(
+            trace_id="t2",
+            stage=FailureStage.ANSWER_GENERATION,
+            failure_type="empty_retrieval",
+            propagated=True,
+            root_cause="retrieval",
+        ),
+    ]
+
+    acc = root_cause_accuracy(
+        records,
+        [FailureStage.NONE, FailureStage.RETRIEVAL],
+        include_success=False,
+    )
+
+    assert acc == 1.0
+
+
+def test_root_cause_accuracy_requires_equal_lengths():
+    records = [_make_record(FailureStage.RETRIEVAL)]
+
+    with pytest.raises(ValueError):
+        root_cause_accuracy(records, [])
 
 
 def test_batch_mix_accuracy():
