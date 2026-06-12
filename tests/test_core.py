@@ -1,6 +1,5 @@
 """Tests for agenticrag.core."""
 
-import pytest
 from agenticrag.core import (
     FailureStage,
     PipelineTrace,
