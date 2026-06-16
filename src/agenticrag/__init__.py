@@ -27,6 +27,7 @@ from .evaluate import (
 from .data import make_trace, make_dataset, make_multi_hop_trace, build_knowledge_graph, make_multi_hop_corpus
 from .retrievers import BM25Retriever, TokenOverlapRetriever
 from .datasets import QASample, load_hotpotqa, load_musique, load_dataset, iter_batches
+from .injection import FailureInjector, InjectionResult, injection_sensitivity
 
 __all__ = [
     # Core models
@@ -68,4 +69,8 @@ __all__ = [
     "load_musique",
     "load_dataset",
     "iter_batches",
+    # Failure injection
+    "FailureInjector",
+    "InjectionResult",
+    "injection_sensitivity",
 ]
