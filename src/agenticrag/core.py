@@ -26,6 +26,7 @@ class FailureType(str, Enum):
     # Multi-hop / loop failures
     OVER_RETRIEVAL = "over_retrieval"     # exhausted iteration budget without satisfying query
     CONTEXT_OVERFLOW = "context_overflow" # retrieved docs exceed context window
+    IRRELEVANT_RETRIEVAL = "irrelevant_retrieval"  # docs retrieved but off-topic
     # No failure
     SUCCESS = "success"
 
