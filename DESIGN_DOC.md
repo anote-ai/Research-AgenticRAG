@@ -1,275 +1,293 @@
-# Research Design Document: AgenticRAG
+# Research Design Document: AgenticRAG — Failure Propagation in Agentic RAG Pipelines
 
 ## Vision Statement
 
-Pioneer **AgenticRAG**: a framework where AI agents dynamically decide *when* to retrieve, *what* to retrieve, and *how many times* to iterate — moving beyond single-shot RAG to autonomous, multi-step information gathering that matches or exceeds human research assistant quality on complex, multi-hop questions, at production-feasible latency and cost.
+Characterize **how failures propagate** in agentic RAG systems: when retrieval goes wrong at hop N, does the agent self-correct, or does the error cascade into tool-call failures and hallucinated answers? This project provides the first empirical framework for injecting controlled faults into multi-hop RAG pipelines, attributing root causes, and measuring propagation severity — enabling practitioners to understand and mitigate failure modes before deploying agentic RAG at scale.
+
+**Target venue**: EMNLP ORACLE 2026 (Workshop on Robust and Reliable LLMs)
 
 ---
 
 ## Problem Statement & Novelty
 
-Standard RAG (retrieve-then-generate) has a fundamental architectural mismatch with complex information needs:
+Agentic RAG systems chain retrieval, tool calls, and generation across multiple hops. Each stage can fail, and failures do not stay local — a missing document at hop 1 can produce hallucinated answers at generation without any intermediate signal. Existing literature:
 
-1. **Static retrieval**: Retrieve once, generate once. Fails on multi-hop questions requiring iterative evidence gathering.
-2. **Always-retrieve**: Systems retrieve even for questions answerable from parametric memory, wasting latency and cost.
-3. **No retrieval gating**: No mechanism to decide when evidence is sufficient vs. when more retrieval is needed.
-4. **Fixed query formulation**: Uses the user's literal question as the retrieval query, ignoring that reformulation often dramatically improves recall.
-
-Existing approaches (Self-RAG, FLARE, ReAct) address parts of this problem but lack:
-- A principled **retrieval gating model** with calibrated thresholds
-- Empirical characterization of the **efficiency-accuracy tradeoff curve**
-- Evaluation on **adversarial queries** designed to trigger unnecessary retrieval
-- A **cost model** for comparing agentic vs. standard RAG in production
+1. **Evaluates end-to-end accuracy**, ignoring where in the pipeline the failure originated.
+2. **Has no controlled injection methodology** — failures are observed naturalistically, making attribution noisy.
+3. **Does not measure propagation** — whether an early-stage failure amplifies, attenuates, or triggers recovery.
+4. **Lacks per-stage metrics** — accuracy alone cannot distinguish a retrieval failure from an answer-generation failure.
 
 ### Novel Contributions
 
 | Contribution | Description |
 |---|---|
-| **Retrieval gating model** | Binary classifier deciding retrieve vs. generate-from-memory, with calibrated confidence |
-| **RGAR metric** | Retrieval-Gated Accuracy Rate: accuracy weighted by retrieval efficiency |
-| **Multi-hop orchestration** | Iterative sub-query decomposition with stopping criterion |
-| **Adversarial query set** | 500 queries designed to test over-retrieval and under-retrieval failure modes |
-| **Production cost model** | First empirical cost comparison: agentic RAG vs. standard RAG at scale |
+| **Controlled failure injection** | `FailureInjector` applies five fault types (empty retrieval, irrelevant docs, no tool calls, empty answer, hallucination) at specific hops, enabling causal rather than correlational analysis |
+| **Root-cause accuracy metric** | Fraction of traces where `DiagnosticBenchmark` correctly identifies the earliest failing stage — the first evaluation of diagnostic precision for agentic RAG |
+| **Failure amplification curves** | Per-hop failure rates showing whether errors compound or attenuate as hop depth increases |
+| **Recovery rate metric** | Fraction of mid-pipeline failures that self-correct by the final hop — quantifies agent robustness |
+| **Ablation experiment runner** | `run_ablation` sweeps the (injection method × hop) grid, producing paper-ready benchmark tables |
 
-### RGAR Definition
+### Failure Taxonomy
 
 ```
-RGAR = Accuracy × Retrieval_Efficiency
+FailureStage:
+  RETRIEVAL         — empty_retrieval, irrelevant_retrieval, over_retrieval, context_overflow
+  TOOL_CALL         — no_tool_calls
+  ANSWER_GENERATION — empty_answer, incorrect_answer, hallucination
+  NONE              — success (no failure)
 
-where:
-  Retrieval_Efficiency = 1 - (unnecessary_retrievals / total_retrievals)
-  unnecessary_retrieval = retrieval_call where answer_was_in_parametric_memory
-
-Interpretation:
-  RGAR = 1.0: perfect accuracy + zero unnecessary retrievals
-  RGAR < 0.5: either poor accuracy or excessive retrieval waste
+Propagation rule:
+  A failure is "propagated" if it originated at an early stage but is detected
+  at a later stage. DiagnosticBenchmark attributes each failure to its root-cause
+  stage, not its observation stage.
 ```
 
 ---
 
-## Research Objectives
+## Research Questions
 
-1. Build a **retrieval gating model** that achieves >90% accuracy in deciding when to retrieve vs. generate from memory.
-2. Show that **query reformulation** improves multi-hop recall by ≥20 pp vs. literal query pass-through.
-3. Characterize the **efficiency-accuracy Pareto curve** for agentic RAG with variable iteration budgets.
-4. Demonstrate that AgenticRAG achieves >85% of maximum accuracy at <50% of the retrieval calls of "always retrieve" baselines.
-5. Evaluate on **adversarial queries** to expose failure modes specific to agentic architectures.
-
----
-
-## Dataset Construction
-
-### Question Types
-
-| Type | Count | Description | Retrieval Required |
-|---|---|---|---|
-| Single-hop factual | 500 | Direct fact lookup | Yes |
-| Parametric memory | 500 | Answerable from model knowledge | No |
-| Multi-hop (2-hop) | 500 | Two retrieval steps needed | Yes (×2) |
-| Multi-hop (3+ hop) | 300 | Three or more retrieval steps | Yes (×3+) |
-| Comparative | 300 | Compare entities across documents | Yes (×2) |
-| Temporal reasoning | 300 | Time-sensitive, requires recent retrieval | Yes |
-| Adversarial over-retrieve | 250 | Designed to trigger unnecessary retrieval | No |
-| Adversarial under-retrieve | 250 | Designed to cause insufficient retrieval | Yes |
-
-**Total: 2,900 questions**
-
-### Corpus
-- Wikipedia (2024 snapshot): general knowledge
-- PubMed abstracts: biomedical domain
-- ArXiv (CS/AI): technical domain
-- News (2023–2024): time-sensitive facts
+1. **How often do retrieval failures propagate to answer-generation failures?** — Is the pipeline a shock absorber or an amplifier?
+2. **Does injection hop depth predict propagation severity?** — Are hop-1 failures more damaging than hop-3 failures?
+3. **Can DiagnosticBenchmark correctly identify the root-cause stage?** — What is its root-cause accuracy vs. each injection type?
+4. **Does the pipeline self-correct after mid-pipeline faults?** — What is the recovery rate across failure types?
+5. **Do retrieval-stage failures produce measurably different severity distributions than answer-stage failures?** — Can severity alone triage failure type?
 
 ---
 
-## Systems Under Evaluation
+## Implemented Architecture
 
-| System | Architecture | Gating | Iterations | Notes |
-|---|---|---|---|---|
-| Standard RAG (BM25) | Retrieve-once | None | 1 | Baseline |
-| Standard RAG (dense) | Retrieve-once | None | 1 | Baseline |
-| Self-RAG | Self-reflective | LLM token | Variable | Prior work |
-| FLARE | Forward-look | Confidence | Variable | Prior work |
-| ReAct | Tool-use | LLM decision | Variable | Prior work |
-| AgenticRAG-Basic | Gating model | Classifier | ≤3 | Ours (v1) |
-| AgenticRAG-Full | Gating + reformulation | Classifier | ≤5 | Ours (v2) |
-| Oracle RAG | Always correct retrieval | — | Optimal | Upper bound |
+### Core Data Model ([src/agenticrag/core.py](src/agenticrag/core.py))
+
+```
+PipelineTrace
+  ├── query, retrieved_docs, tool_calls, final_answer, reference_answer
+  ├── hop_queries: List[str]     — query used at each hop
+  ├── hop_docs: List[List[str]]  — docs retrieved at each hop
+  └── iterations_used: int
+
+FailureRecord
+  ├── stage: FailureStage        — attributed root-cause stage
+  ├── failure_type: FailureType  — specific failure sub-type
+  ├── propagated: bool           — whether failure crossed stage boundaries
+  ├── root_cause: str            — human-readable attribution
+  └── severity: float ∈ [0, 1]
+
+AgenticRAGPipeline
+  └── run(query, corpus) → PipelineTrace   — multi-hop loop with reformulation
+
+DiagnosticBenchmark
+  ├── diagnose_trace(trace, reference) → FailureRecord
+  ├── batch_diagnose(traces, references) → List[FailureRecord]
+  └── attribute_failures(records) → {by_stage, total_failures, propagation_rate}
+```
+
+### Failure Injection ([src/agenticrag/injection.py](src/agenticrag/injection.py))
+
+```
+FailureInjector methods:
+  inject_empty_retrieval(trace, hop)         — clears docs at hop N and all later hops
+  inject_irrelevant_docs(trace, noise, hop)  — replaces docs at hop N; later hops untouched
+  inject_no_tool_calls(trace)                — clears all tool calls
+  inject_empty_answer(trace)                 — clears final answer only
+  inject_hallucinated_answer(trace, text)    — replaces answer with ungrounded fabrication
+
+injection_sensitivity(traces, refs, injector, benchmark, method) → float
+  — fraction of injected failures correctly detected (validation metric)
+```
+
+### Ablation Runner ([src/agenticrag/experiment.py](src/agenticrag/experiment.py))
+
+```
+run_ablation(traces, references, injector, benchmark, methods, hops) → AblationResult
+  — sweeps (method × hop) grid; baseline diagnosis + per-cell diagnosis
+
+AblationResult
+  ├── baseline_records: List[FailureRecord]
+  ├── cells: List[AblationCell]              — one per (method, hop) pair
+  ├── sensitivity_table() → Dict[str, float]
+  ├── metrics_table()     → Dict[str, Dict[str, float]]   ← paper benchmark table
+  └── records_by_hop(method) → Dict[int, records]        ← input to PropagationGraph
+
+AblationCell fields:
+  injection_method, hop, injected_stage, records,
+  sensitivity, root_cause_accuracy_score, severity_rate, stage_rates
+```
+
+### Evaluation Metrics ([src/agenticrag/evaluate.py](src/agenticrag/evaluate.py))
+
+| Metric | Function | What it measures |
+|---|---|---|
+| Root-cause accuracy | `root_cause_accuracy(records, true_stages)` | Fraction where diagnosed stage = injected stage |
+| Failure amplification | `failure_amplification_rate(records_by_hop)` | Failure rate vs. hop depth; rising = amplifying pipeline |
+| Recovery rate | `recovery_rate(records_by_hop)` | Fraction of mid-pipeline failures that self-correct |
+| Severity rate | `severity_weighted_failure_rate(records)` | Mean severity of non-NONE records |
+| Stage attribution | `stage_attribution_rate(records, stage)` | Fraction of failures attributed to a specific stage |
+| Propagation rate | `propagation_rate(records)` | Fraction of records with propagated=True |
+| End-to-end accuracy | `end_to_end_accuracy(records)` | Fraction of successful traces (stage == NONE) |
+| Multi-hop accuracy | `multi_hop_accuracy(traces)` | Success rate among traces requiring >1 hop |
+| Loop efficiency | `retrieval_loop_efficiency(traces, max_iter)` | Mean fraction of hop budget unused |
+
+### Retrievers ([src/agenticrag/retrievers.py](src/agenticrag/retrievers.py))
+
+- `BM25Retriever` — rank-bm25-backed sparse retrieval; falls back to pure-Python TF-IDF
+- `TokenOverlapRetriever` — Jaccard token overlap; zero-dependency baseline
+
+### Datasets ([src/agenticrag/datasets.py](src/agenticrag/datasets.py))
+
+- `HotpotQAAdapter` — HuggingFace `datasets` integration; built-in 5-example fallback
+- `MuSiQueAdapter` — MuSiQue 2-hop subset; built-in fallback
 
 ---
 
 ## Experimental Design
 
-### Baseline Experiment (Experiment 0)
-**Protocol**: Run Standard RAG (BM25 + GPT-4o reader) on all 2,900 questions. Compute Accuracy, RGAR, mean retrieval calls per question.
+### Phase 0: Baseline (no injection)
+**Goal**: Establish baseline failure rates and stage distribution on HotpotQA + MuSiQue.
 
-**Expected result**: Accuracy ≈ 0.67 overall; RGAR ≈ 0.48 (accuracy hurt by unnecessary retrievals on parametric memory questions); 1.0 retrieval calls/question.
+**Protocol**: Run `DiagnosticBenchmark.batch_diagnose` on 500 naturally produced traces (AgenticRAGPipeline with BM25Retriever, max 3 hops). Compute end-to-end accuracy, per-stage failure rates, mean severity, propagation rate.
+
+**Expected**: ~30–40% of traces fail; retrieval stage accounts for ~60% of failures; propagation rate ~50% (retrieval failures cascade to answer stage).
 
 ---
 
-### Experiment 1: Retrieval Gating Model
-**Hypothesis**: A fine-tuned gating classifier achieves >90% accuracy on the retrieve vs. generate decision, outperforming LLM self-assessment.
+### Experiment 1: Injection Sensitivity
+**Hypothesis**: DiagnosticBenchmark correctly detects >85% of injected faults for all five injection methods.
 
-**Protocol**:
-1. Collect training data: (question, context) → {retrieve, generate} labels from human annotators (n=1,500).
-2. Fine-tune DeBERTa-v3 as binary gating classifier.
-3. Compare: (a) fine-tuned classifier, (b) GPT-4o prompted "Do you need to retrieve?", (c) confidence-threshold baseline.
-4. Evaluate on held-out 400 questions.
+**Protocol**: Apply `injection_sensitivity` for each of the five FailureInjector methods on 200 clean traces. Report detection rate per method.
 
 **Expected results**:
 
-| Gating Method | Accuracy | False Positive (unnecessary retrieve) | False Negative (missed retrieve) |
+| Injection Method | Expected Sensitivity |
+|---|---|
+| inject_empty_retrieval | ≥ 0.95 |
+| inject_irrelevant_docs | ≥ 0.80 (harder: answer may still form) |
+| inject_no_tool_calls | ≥ 0.90 |
+| inject_empty_answer | ≥ 0.98 |
+| inject_hallucinated_answer | ≥ 0.85 |
+
+---
+
+### Experiment 2: Root-Cause Accuracy
+**Hypothesis**: DiagnosticBenchmark achieves ≥80% root-cause accuracy across all injection types.
+
+**Protocol**: Run `run_ablation` over all 5 methods × hops [1, 2, 3]. For each cell, compare diagnosed stage to injected stage via `root_cause_accuracy`. Report `AblationResult.metrics_table()`.
+
+**Expected results** (paper benchmark table):
+
+| Method | Root-Cause Acc. | Sensitivity | Severity |
 |---|---|---|---|
-| Always retrieve (baseline) | — | 100% | 0% |
-| Confidence threshold | 0.71 | 0.35 | 0.22 |
-| GPT-4o self-assess | 0.83 | 0.18 | 0.14 |
-| Fine-tuned classifier | 0.91 | 0.09 | 0.08 |
-
-- Fine-tuned classifier is both more accurate and cheaper than LLM self-assessment.
-
----
-
-### Experiment 2: Query Reformulation
-**Hypothesis**: LLM-based query reformulation (decomposing multi-hop questions into sub-queries) improves Recall@10 by ≥20 pp vs. literal query.
-
-**Protocol**:
-1. For multi-hop questions (n=800), compare: (a) literal query, (b) LLM-decomposed sub-queries, (c) iterative reformulation (reformulate after each retrieval step).
-2. Compute Recall@10 for each method.
-3. Measure mean sub-queries generated and total retrieval calls.
-
-**Expected results**:
-- Literal query: Recall@10 ≈ 0.51 on multi-hop
-- LLM-decomposed: Recall@10 ≈ 0.72 (+21 pp)
-- Iterative reformulation: Recall@10 ≈ 0.79 (+28 pp)
-- Mean sub-queries: 1.0 vs. 2.1 vs. 2.8 retrieval calls
-- Cost-recall tradeoff: iterative is optimal above 0.75 recall target; decomposition is optimal for 0.65–0.75
+| inject_empty_retrieval@hop1 | 0.91 | 0.95 | 0.88 |
+| inject_empty_retrieval@hop2 | 0.85 | 0.89 | 0.82 |
+| inject_empty_retrieval@hop3 | 0.78 | 0.81 | 0.74 |
+| inject_irrelevant_docs@hop1 | 0.73 | 0.80 | 0.61 |
+| inject_no_tool_calls | 0.88 | 0.92 | 0.70 |
+| inject_empty_answer | 0.94 | 0.98 | 0.80 |
+| inject_hallucinated_answer | 0.82 | 0.87 | 0.65 |
 
 ---
 
-### Experiment 3: Efficiency-Accuracy Pareto Curve
-**Hypothesis**: AgenticRAG-Full achieves ≥85% of Oracle RAG accuracy at ≤50% of Oracle's retrieval calls.
+### Experiment 3: Failure Amplification Curves
+**Hypothesis**: Retrieval failures injected at earlier hops produce higher downstream failure rates (amplification), while later-hop injections are partially absorbed.
 
-**Protocol**:
-1. Sweep the iteration budget (1 to 5 retrieval calls allowed).
-2. For each budget: compute Accuracy and mean retrieval calls for AgenticRAG-Full.
-3. Compare to Oracle RAG (unlimited, optimal retrieval).
-4. Plot efficiency-accuracy Pareto curve.
+**Protocol**: For `inject_empty_retrieval` and `inject_irrelevant_docs`, use `AblationResult.records_by_hop(method)` as input to `failure_amplification_rate`. Plot failure rate vs. hop depth for each retriever (BM25 vs. TokenOverlap).
 
-**Expected results**:
-
-| Budget | Accuracy | Mean Calls | % of Oracle Accuracy |
-|---|---|---|---|
-| 1 (standard) | 0.67 | 1.0 | 72% |
-| 2 | 0.76 | 1.6 | 82% |
-| 3 (AgenticRAG-Basic) | 0.82 | 2.1 | 88% |
-| 5 (AgenticRAG-Full) | 0.86 | 2.9 | 93% |
-| Oracle | 0.93 | 4.8 | 100% |
-
-- Key finding: AgenticRAG-Full achieves 93% of Oracle accuracy at 60% of Oracle retrieval calls.
+**Expected result**: Monotonically decreasing failure rate with hop depth for empty retrieval (earlier = more severe). Irrelevant docs show a flatter curve (pipeline compensates on later hops).
 
 ---
 
-### Experiment 4: Adversarial Evaluation
-**Hypothesis**: Agentic systems are vulnerable to adversarial over-retrieval (>2× retrieval calls on parametric questions) and under-retrieval (fails to retrieve when needed); RGAR exposes this where accuracy does not.
+### Experiment 4: Recovery Rate by Failure Type
+**Hypothesis**: Answer-stage failures (empty_answer, hallucination) have near-zero recovery rate; retrieval-stage failures have non-trivial recovery rate (~20–35%) due to iterative reformulation.
 
-**Protocol**:
-1. Run all systems on 500 adversarial questions (250 over-retrieve, 250 under-retrieve).
-2. Compute accuracy, retrieval calls, and RGAR for adversarial subsets.
-3. Compare systems' vulnerability profiles.
+**Protocol**: Compute `recovery_rate(records_by_hop)` for hop methods across 3-hop traces. Compare retrieval-stage recovery vs. answer-stage recovery.
 
 **Expected results**:
-- Standard RAG (over-retrieve subset): accuracy artificially inflated; RGAR ≈ 0.41 (many unnecessary calls)
-- Self-RAG (under-retrieve subset): accuracy ≈ 0.58; misses critical retrieval in 31% of cases
-- AgenticRAG-Full with gating: RGAR ≈ 0.76 on adversarial set (best among agentic systems)
-- Key finding: RGAR reveals adversarial vulnerabilities invisible to accuracy alone
+- `inject_empty_retrieval`: recovery rate ≈ 0.28 (reformulation partially compensates)
+- `inject_irrelevant_docs`: recovery rate ≈ 0.35 (later hops retrieve different docs)
+- `inject_empty_answer`: recovery rate = 0.0 (answer stage is terminal)
+- `inject_hallucinated_answer`: recovery rate = 0.0 (no further correction step)
 
 ---
 
-### Experiment 5: Production Cost Model
-**Hypothesis**: AgenticRAG-Full costs ≤2× standard RAG per query while improving accuracy by ≥15 pp, making it cost-justified for enterprise deployments.
+### Experiment 5: Retriever × Dataset Benchmark Table
+**Hypothesis**: BM25Retriever has lower failure propagation rates than TokenOverlapRetriever on HotpotQA but similar rates on MuSiQue (which relies on compositional reasoning more than lexical match).
 
-**Protocol**:
-1. Measure cost per query: LLM API calls (gating + generation + reformulation) + retrieval infrastructure.
-2. Compute cost-accuracy tradeoff ratio: (accuracy_improvement / baseline_accuracy) / (cost_increase / baseline_cost).
-3. Compare against Self-RAG, FLARE, ReAct.
+**Protocol**: Run full ablation for both retrievers × both datasets (4 conditions). Report root-cause accuracy and end-to-end accuracy per condition.
 
-**Expected results**:
-- Standard RAG: $0.003/query, 0.67 accuracy
-- AgenticRAG-Full: $0.005/query (+67% cost), 0.86 accuracy (+28% accuracy)
-- Self-RAG: $0.008/query (+167% cost), 0.79 accuracy (+18% accuracy)
-- AgenticRAG efficiency ratio: 0.28/0.67 = 0.42 (best among all agentic systems)
+**Expected result**: BM25 outperforms TokenOverlap on HotpotQA (+12 pp end-to-end accuracy); gap narrows on MuSiQue (compositional reasoning limits retrieval quality regardless of retriever).
 
 ---
 
 ## Expected Results Summary
 
-| Metric | Standard RAG | AgenticRAG-Full | Improvement |
-|---|---|---|---|
-| Accuracy (overall) | 0.67 | 0.86 | +28% |
-| Accuracy (multi-hop) | 0.51 | 0.79 | +55% |
-| RGAR | 0.48 | 0.76 | +58% |
-| Mean retrieval calls | 1.0 | 2.9 | +190% |
-| Cost per query | $0.003 | $0.005 | +67% |
+| Metric | Value |
+|---|---|
+| Baseline end-to-end accuracy (BM25, HotpotQA) | ~0.62 |
+| Mean root-cause accuracy across all injection types | ≥0.83 |
+| Failure amplification (hop1 vs. hop3, empty retrieval) | +31 pp failure rate at hop1 |
+| Recovery rate (retrieval-stage failures) | ~0.30 |
+| Recovery rate (answer-stage failures) | ~0.00 |
+| Sensitivity (all methods, mean) | ≥0.89 |
 
-**Primary claim**: A calibrated retrieval gating model + iterative query reformulation closes 80% of the gap between standard RAG and oracle RAG, with only 67% cost increase — making agentic RAG economically viable for production deployment.
-
----
-
-## Why This Matters
-
-**For researchers**: AgenticRAG provides the first principled framework for agentic retrieval, with metrics (RGAR) and experiments that distinguish genuine reasoning improvement from retrieval over-spending.
-
-**For practitioners**: The cost model and Pareto curve give engineering teams concrete guidance for when to deploy agentic vs. standard RAG.
-
-**For Anote products**: The private chatbot product can directly benefit from AgenticRAG — particularly for complex enterprise queries requiring multi-hop reasoning.
-
-**RSI connection**: AgenticRAG is a building block for recursive self-improvement: an agent that can retrieve its own prior results and improve iteratively is a core RSI primitive.
+**Primary claim**: Early-hop retrieval failures amplify into answer-stage failures at significantly higher rates than late-hop failures, and agentic pipelines achieve non-trivial self-correction (~30%) for mid-pipeline retrieval faults — a recovery mechanism entirely invisible to end-to-end accuracy measurement.
 
 ---
 
-## Implementation Plan
+## Implementation Plan (Actual File Structure)
 
 ```
-research-agenticrag/
-├── data/
-│   ├── questions/       # 2,900 questions with labels
-│   ├── corpus/          # Wikipedia, PubMed, ArXiv, News
-│   └── adversarial/     # 500 adversarial queries
-├── gating/
-│   ├── train_gating.py  # DeBERTa fine-tuning
-│   └── gating_model/    # Saved weights
-├── retrieval/
-│   ├── bm25.py
-│   ├── dense.py
-│   └── hybrid.py
-├── agentic/
-│   ├── orchestrator.py  # Main agentic loop
-│   ├── reformulator.py  # Query reformulation
-│   └── stopping.py      # Iteration stopping criterion
-├── metrics/
-│   ├── rgar.py
-│   └── efficiency.py
-├── experiments/
-│   ├── exp0_baseline.py
-│   ├── exp1_gating.py
-│   ├── exp2_reformulation.py
-│   ├── exp3_pareto.py
-│   ├── exp4_adversarial.py
-│   └── exp5_cost.py
+Research-AgenticRAG/
+├── src/agenticrag/
+│   ├── core.py          # PipelineTrace, FailureRecord, AgenticRAGPipeline, DiagnosticBenchmark
+│   ├── evaluate.py      # All metrics: root_cause_accuracy, failure_amplification_rate, etc.
+│   ├── injection.py     # FailureInjector, InjectionResult, injection_sensitivity
+│   ├── experiment.py    # run_ablation, AblationResult, AblationCell
+│   ├── retrievers.py    # BM25Retriever, TokenOverlapRetriever
+│   ├── datasets.py      # HotpotQAAdapter, MuSiQueAdapter
+│   └── data.py          # Data loading utilities
+├── tests/
+│   ├── test_core.py
+│   ├── test_evaluate.py
+│   ├── test_injection.py
+│   ├── test_propagation.py  # PropagationGraph tests (Phase 2)
+│   └── test_experiment.py
+├── related_work.tex     # LaTeX related work section
+├── related_work.bib     # Bibliography
+└── DESIGN_DOC.md
 ```
+
+**Planned (Phase 2 — next):**
+```
+├── src/agenticrag/propagation.py   # PropagationGraph: causal DAG over failure records
+└── scripts/
+    ├── run_baseline.py
+    ├── run_ablation.py
+    └── plot_amplification.py
+```
+
+---
+
+## Development Roadmap
+
+| Phase | Status | Deliverable |
+|---|---|---|
+| Phase 1: Core infrastructure | **Done** | `core.py`, `evaluate.py`, `retrievers.py`, `datasets.py`; 38 tests passing |
+| Phase 2: Causal propagation graph | **In progress** | `PropagationGraph` class; causal attribution across hops |
+| Phase 3: Injection + ablation harness | **Done** | `injection.py`, `experiment.py`; full ablation grid |
+| Phase 4: Paper experiments + figures | **Next** | Benchmark tables, amplification curves, recovery rate plots |
+
+**Target**: EMNLP ORACLE 2026 submission
 
 ---
 
 ## Timeline
 
-| Phase | Duration | Deliverable |
-|---|---|---|
-| Dataset construction | 6 weeks | 2,900 questions labeled |
-| Gating model training | 3 weeks | Fine-tuned DeBERTa classifier |
-| Agentic system implementation | 4 weeks | AgenticRAG-Basic + Full |
-| Experiments | 5 weeks | All results |
-| Paper writing | 4 weeks | ACL 2026 submission |
-
-**Target venue**: ACL 2026 or NAACL 2026
+| Milestone | Date |
+|---|---|
+| PropagationGraph + causal attribution | June 2026 |
+| Run all 5 experiments | July 2026 |
+| Paper draft (results + analysis) | August 2026 |
+| Related work + intro | August 2026 |
+| EMNLP ORACLE 2026 submission | September 2026 |
 
 ---
 
@@ -277,16 +295,28 @@ research-agenticrag/
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Gating model training data cost | Medium | Start with 500 examples; scale if needed |
-| LLM API cost for large-scale eval | High | Use open-source models for most experiments |
-| Adversarial query design subjectivity | Medium | Two-annotator design + adjudication |
-| ReAct / Self-RAG reproducibility | Medium | Use official implementations |
+| PropagationGraph design complexity | Medium | Start with linear DAG (hop-ordered); generalize later |
+| Small-scale eval limits generalization | High | Supplement with HotpotQA/MuSiQue full splits |
+| Injection realism (faults too clean) | Medium | Add noisy variants: partially empty retrieval, partial hallucination |
+| DiagnosticBenchmark false positives on healthy traces | Low | Measure specificity on clean traces in Experiment 1 |
 
 ---
 
-## Related Issues
+## Why This Matters
 
-- Product integration: private chatbot (AgenticRAG deployment)
-- RSI connection: retrieval as RSI primitive
-- Reproducibility package
-- Related work audit: Self-RAG, FLARE, ReAct, IRCoT
+**For researchers**: This is the first framework that treats failure propagation in agentic RAG as a first-class research problem, with controlled injection methodology and causal metrics. Distinguishes retrieval-stage failures from answer-stage failures in a way that end-to-end accuracy cannot.
+
+**For practitioners**: Failure amplification curves and recovery rates give teams a concrete signal: which stage to harden first, and whether iterative reformulation provides meaningful self-correction.
+
+**For Anote products**: The private chatbot uses agentic RAG for enterprise queries. Understanding failure propagation directly informs when to add retrieval fallbacks vs. answer-validation gates.
+
+---
+
+## Related Work
+
+Key baselines and prior work to situate against:
+- **Self-RAG** (Asai et al., 2023): self-reflective RAG with per-token retrieval decisions — no failure propagation analysis
+- **FLARE** (Jiang et al., 2023): forward-looking active retrieval — uncertainty-triggered, no injection methodology
+- **ReAct** (Yao et al., 2022): tool-use agent loop — evaluates task completion, not stage-level failure attribution
+- **IRCoT** (Trivedi et al., 2022): iterative retrieval with CoT — multi-hop, but no controlled fault study
+- **HotpotQA / MuSiQue**: evaluation datasets providing multi-hop structure for propagation experiments
