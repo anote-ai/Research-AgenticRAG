@@ -36,6 +36,7 @@ from .experiment import (
     ANSWER_METHODS,
     ALL_METHODS,
 )
+from .propagation import PropagationEdge, PropagationGraph
 
 __all__ = [
     # Core models
@@ -88,4 +89,7 @@ __all__ = [
     "HOP_METHODS",
     "ANSWER_METHODS",
     "ALL_METHODS",
+    # Propagation graph
+    "PropagationEdge",
+    "PropagationGraph",
 ]
