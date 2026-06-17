@@ -128,12 +128,18 @@ class AgenticRAGPipeline:
         self,
         knowledge_graph: Optional[KnowledgeGraph] = None,
         max_iterations: int = 3,
+        retriever: Any = None,
     ) -> None:
         self.knowledge_graph = knowledge_graph or KnowledgeGraph()
         self.max_iterations = max_iterations
+        self._retriever = retriever  # BM25Retriever | TokenOverlapRetriever | None
 
     def _retrieve(self, query: str, docs: List[str]) -> List[str]:
-        """Return docs with token overlap > 0 against query; fallback to all."""
+        """Return top-k docs via injected retriever, or fall back to token overlap."""
+        if self._retriever is not None:
+            ranked = self._retriever.retrieve(query, corpus=docs, top_k=5)
+            relevant = [doc for doc, score in ranked if score > 0]
+            return relevant if relevant else docs[:2]
         ranked = [(doc, _token_overlap(query, doc)) for doc in docs]
         relevant = [doc for doc, score in ranked if score > 0]
         return relevant if relevant else docs[:2]
