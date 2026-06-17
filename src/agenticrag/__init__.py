@@ -28,6 +28,14 @@ from .data import make_trace, make_dataset, make_multi_hop_trace, build_knowledg
 from .retrievers import BM25Retriever, TokenOverlapRetriever
 from .datasets import QASample, load_hotpotqa, load_musique, load_dataset, iter_batches
 from .injection import FailureInjector, InjectionResult, injection_sensitivity
+from .experiment import (
+    AblationCell,
+    AblationResult,
+    run_ablation,
+    HOP_METHODS,
+    ANSWER_METHODS,
+    ALL_METHODS,
+)
 from .propagation import PropagationEdge, PropagationGraph
 
 __all__ = [
@@ -74,6 +82,13 @@ __all__ = [
     "FailureInjector",
     "InjectionResult",
     "injection_sensitivity",
+    # Ablation experiment runner
+    "AblationCell",
+    "AblationResult",
+    "run_ablation",
+    "HOP_METHODS",
+    "ANSWER_METHODS",
+    "ALL_METHODS",
     # Propagation graph
     "PropagationEdge",
     "PropagationGraph",
