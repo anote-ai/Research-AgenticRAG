@@ -1,86 +1,75 @@
 # research-agenticrag
 
-**Failure Propagation in Agentic RAG Pipelines: A Diagnostic Benchmark**
-
-## Overview
-
-This repository contains the research code for studying how retrieval errors cascade into
-agent tool-calls and final answers in agentic RAG systems. We introduce a diagnostic benchmark
-that attributes end-to-end failures to one of three pipeline stages.
+**Failure diagnosis and attribution for agentic RAG pipelines.**
 
 ## Failure Taxonomy
 
-| Stage             | Failure Types                              | Examples                                         |
-|-------------------|--------------------------------------------|--------------------------------------------------|
-| Retrieval         | empty_retrieval, low_relevance, truncation | No docs returned; top-k irrelevant docs          |
-| Tool Call         | tool_no_output, tool_error, timeout        | API error; malformed arguments; rate limit       |
-| Answer Generation | wrong_answer, hallucination, refusal       | Off-topic response; fabricated citations         |
-| None              | —                                          | Correct end-to-end trace                         |
+| Stage              | Failure Type      | Propagated | Severity | Description                                |
+|--------------------|-------------------|------------|----------|-----------------------------------------|
+| Retrieval          | empty_retrieval   | Yes        | 0.9      | No documents retrieved from corpus      |
+| Tool Call          | no_tool_calls     | Yes        | 0.7      | Agent skipped tool invocation           |
+| Answer Generation  | empty_answer      | No         | 0.8      | LLM produced empty response             |
+| Answer Generation  | incorrect_answer  | No         | 0.5      | Answer does not match reference         |
+| None               | success           | No         | 0.0      | Pipeline completed correctly            |
 
-## Pipeline Diagram
+## Pipeline Architecture
 
 ```
 Query
   │
   ▼
-┌─────────────┐     ┌──────────────┐     ┌───────────────────┐
-│  Retrieval  │────▶│  Tool Calls  │────▶│ Answer Generation │
-└─────────────┘     └──────────────┘     └───────────────────┘
-       │                    │                      │
-  [Stage 1 fail]      [Stage 2 fail]         [Stage 3 fail]
-  propagates ──────────────▶                 does not propagate
+[Retrieval] ──fail──► empty_retrieval (propagated)
+  │
+  ▼
+[Tool Call] ──fail──► no_tool_calls (propagated)
+  │
+  ▼
+[Answer Generation] ──fail──► empty_answer / incorrect_answer
+  │
+  ▼
+[Success]
 ```
 
-## Diagnostic Methodology
+## Diagnostic Method
 
-1. **Trace collection** — Run a target agentic RAG system on benchmark queries; record all
-   retrieved documents, tool calls, and final answers.
-2. **Stage attribution** — Apply heuristics and LLM-based classifiers to attribute each
-   failure to its root stage.
-3. **Propagation analysis** — Flag failures where the stage-1 error causally leads to
-   stage-2 or stage-3 errors.
-4. **Confusion matrix** — Compare attributed stages to human-labeled ground truth.
+1. Run `DiagnosticBenchmark.diagnose_trace` on each pipeline trace.
+2. Aggregate with `attribute_failures` to get per-stage counts and propagation rates.
+3. Evaluate with `end_to_end_accuracy`, `severity_weighted_failure_rate`, and `stage_attribution_rate`.
 
-## Benchmark Statistics Template
+## Benchmark Stats Template
 
-| Metric                     | Value  |
-|----------------------------|--------|
-| Total traces               | TBD    |
-| Retrieval failure rate     | TBD    |
-| Tool-call failure rate     | TBD    |
-| Answer generation fail rate| TBD    |
-| Propagation rate           | TBD    |
-| End-to-end accuracy        | TBD    |
+> **Note:** the table below is a *template* showing the metrics this benchmark
+> reports and their expected shape -- the values are illustrative placeholders,
+> not measured results from a real experiment run. See `results/README.md` for
+> how to generate real numbers and `PAPER_DRAFT.md` for which figures in
+> `DESIGN_DOC.md` are still projections vs. confirmed.
 
-## Installation
+| Metric                      | Value  |
+|-----------------------------|--------|
+| End-to-end accuracy         | 0.40   |
+| Retrieval failure rate      | 0.20   |
+| Tool call failure rate      | 0.12   |
+| Answer generation fail rate | 0.28   |
+| Propagation rate            | 0.32   |
 
-```bash
-pip install -e ".[dev]"
-```
+## More resources
 
-## Usage
+- [`DESIGN_DOC.md`](DESIGN_DOC.md) -- full research design, experiments, and roadmap.
+- [`PAPER_DRAFT.md`](PAPER_DRAFT.md) -- paper draft skeleton (sections implemented, results marked TBD/projected pending real experiment runs).
+- [`BLOG.md`](BLOG.md) -- plain-language summary of the project for a non-academic audience.
+- [`results/`](results/) -- where experiment script output lands once `scripts/run_baseline.py` / `run_ablation.py` are actually executed.
 
-```python
-from agenticrag.core import DiagnosticBenchmark, PipelineTrace
-from agenticrag.evaluate import stage_attribution_rate, propagation_rate, end_to_end_accuracy
-from agenticrag.core import FailureStage
+## Venue
 
-benchmark = DiagnosticBenchmark()
-traces = benchmark.load_traces("data/traces.jsonl")
-records = [benchmark.diagnose_trace(t, {}) for t in traces]
-
-print("Retrieval failure rate:", stage_attribution_rate(records, FailureStage.RETRIEVAL))
-print("Propagation rate:", propagation_rate(records))
-print("E2E accuracy:", end_to_end_accuracy(traces))
-```
+Submitted to **EMNLP ORACLE 2026** — Workshop on Observations, Reasoning, and Causal Analysis in Language Evaluation.
 
 ## Citation
 
 ```bibtex
-@misc{anote2024agenticrag,
-  title  = {Failure Propagation in Agentic RAG Pipelines: A Diagnostic Benchmark},
-  author = {Anote AI Research},
-  year   = {2024},
-  url    = {https://github.com/anote-ai/research-agenticrag},
+@inproceedings{anote2026agenticrag,
+  title     = {Failure Attribution in Agentic RAG: A Diagnostic Benchmark},
+  author    = {Anote AI},
+  booktitle = {EMNLP ORACLE 2026},
+  year      = {2026},
 }
 ```
