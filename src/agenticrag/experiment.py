@@ -391,10 +391,14 @@ class IdentifiabilityResult:
     recovery_rate_by_depth: Dict[int, float]
     n_total_by_depth: Dict[int, int]
     n_failed_by_depth: Dict[int, int]
+    n_eligible_by_depth: Dict[int, int] = field(default_factory=dict)
+    n_skipped_short_trace_by_depth: Dict[int, int] = field(default_factory=dict)
+    n_skipped_base_incorrect_by_depth: Dict[int, int] = field(default_factory=dict)
     # Per-depth raw diagnoses + ground truth, so accuracy can be re-scored under
     # a different criterion (stage / hop_tolerance) without re-spending tokens.
     # raw_by_depth[depth] = {"truth": [[stage, hop], ...],
-    #                        "predictions": {name: [[stage, hop, cost], ...]}}
+    #                        "predictions": {name: [[stage, hop, cost], ...]},
+    #                        "metadata": [{case metadata}, ...]}
     raw_by_depth: Dict[int, Dict[str, Any]] = field(default_factory=dict)
 
     def accuracy_table(self) -> Dict[str, Dict[str, float]]:
@@ -413,6 +417,13 @@ class IdentifiabilityResult:
             "recovery_rate_by_depth": {str(k): v for k, v in self.recovery_rate_by_depth.items()},
             "n_total_by_depth": {str(k): v for k, v in self.n_total_by_depth.items()},
             "n_failed_by_depth": {str(k): v for k, v in self.n_failed_by_depth.items()},
+            "n_eligible_by_depth": {str(k): v for k, v in self.n_eligible_by_depth.items()},
+            "n_skipped_short_trace_by_depth": {
+                str(k): v for k, v in self.n_skipped_short_trace_by_depth.items()
+            },
+            "n_skipped_base_incorrect_by_depth": {
+                str(k): v for k, v in self.n_skipped_base_incorrect_by_depth.items()
+            },
             "raw_by_depth": {str(k): v for k, v in self.raw_by_depth.items()},
         }
 
@@ -427,6 +438,8 @@ def run_identifiability(
     criterion: str = "hop",
     hop_tolerance: int = 0,
     min_corpus: int = 1,
+    strict_depth: bool = True,
+    require_base_correct: bool = True,
     checkpoint_path: Optional[str] = None,
     checkpoint_extra: Optional[Dict[str, Any]] = None,
     resume: bool = False,
@@ -458,6 +471,13 @@ def run_identifiability(
         Forwarded to the localization metric ('hop', 'stage', or 'both').
     min_corpus:
         Skip samples whose corpus is smaller than this (need docs to retrieve).
+    strict_depth:
+        When True, a requested injection depth is eligible only if the base trace
+        actually reached that many hops. This prevents depth-2/3 buckets from
+        silently containing clamped hop-1 interventions on shallow traces.
+    require_base_correct:
+        When True, only inject into base traces that answered correctly. Otherwise
+        a natural base failure can be miscounted as a causal effect of injection.
     checkpoint_path:
         If set, the partial result is written here as JSON after *each depth*
         completes, so an API error (e.g. credit exhaustion) mid-sweep never
@@ -474,6 +494,9 @@ def run_identifiability(
     recovery: Dict[int, float] = {}
     n_total: Dict[int, int] = {}
     n_failed: Dict[int, int] = {}
+    n_eligible: Dict[int, int] = {}
+    n_skipped_short_trace: Dict[int, int] = {}
+    n_skipped_base_incorrect: Dict[int, int] = {}
     raw: Dict[int, Dict[str, Any]] = {}
 
     # Per-depth resume: preload depths already computed in a matching checkpoint,
@@ -481,6 +504,7 @@ def run_identifiability(
     done_depths = _preload_checkpoint(
         checkpoint_path if resume else None, checkpoint_extra, names,
         accuracy, cost, recovery, n_total, n_failed, raw,
+        n_eligible, n_skipped_short_trace, n_skipped_base_incorrect,
     )
 
     def _snapshot() -> IdentifiabilityResult:
@@ -492,6 +516,9 @@ def run_identifiability(
             recovery_rate_by_depth=recovery,
             n_total_by_depth=n_total,
             n_failed_by_depth=n_failed,
+            n_eligible_by_depth=n_eligible,
+            n_skipped_short_trace_by_depth=n_skipped_short_trace,
+            n_skipped_base_incorrect_by_depth=n_skipped_base_incorrect,
             raw_by_depth=raw,
         )
 
@@ -500,29 +527,66 @@ def run_identifiability(
             continue  # already computed in a matching checkpoint (resume)
         injected: List[InjectionResult] = []
         refs: List[Dict[str, Any]] = []
+        metadata: List[Dict[str, Any]] = []
+        eligible_samples = 0
+        skipped_short = 0
+        skipped_base_wrong = 0
         for s in samples:
             corpus = list(s.supporting_docs)
             if len(corpus) < min_corpus:
                 continue
             base = agent.run(s.question, corpus, reference_answer=s.answer)
+            base_hops = len(base.hop_docs)
+            if strict_depth and base_hops < depth:
+                skipped_short += 1
+                continue
+            base_correct = _answer_correct(base.final_answer, s.answer)
+            if require_base_correct and not base_correct:
+                skipped_base_wrong += 1
+                continue
+            eligible_samples += 1
             for method in methods:
                 res = getattr(injector, method)(base, corpus, hop=depth)
                 injected.append(res)
                 refs.append({"answer": s.answer, "corpus": corpus})
+                final_correct = _answer_correct(res.injected_trace.final_answer, s.answer)
+                metadata.append({
+                    "sample_id": getattr(s, "sample_id", ""),
+                    "dataset": getattr(s, "dataset", ""),
+                    "question": getattr(s, "question", ""),
+                    "reference_answer": getattr(s, "answer", ""),
+                    "requested_depth": depth,
+                    "actual_hop": res.injected_at_hop,
+                    "base_hop_count": base_hops,
+                    "declared_hop_count": getattr(s, "hop_count", None),
+                    "base_correct": base_correct,
+                    "base_answer": base.final_answer,
+                    "intervention_method": method,
+                    "injected_failure_type": res.injected_failure_type.value,
+                    "injected_stage": res.injected_stage.value,
+                    "final_correct": final_correct,
+                    "recovered": final_correct,
+                    "final_answer": res.injected_trace.final_answer,
+                    "iterations_used": res.injected_trace.iterations_used,
+                })
 
+        n_eligible[depth] = eligible_samples
+        n_skipped_short_trace[depth] = skipped_short
+        n_skipped_base_incorrect[depth] = skipped_base_wrong
         n_total[depth] = len(injected)
         recovery[depth] = counterfactual_recovery_rate(injected, refs) if injected else 0.0
 
         # Restrict RCA to traces where the injected fault actually caused a wrong
         # answer — a recovered trace has no failure to attribute.
         failed = [
-            (r, ref)
-            for r, ref in zip(injected, refs)
+            (r, ref, meta)
+            for r, ref, meta in zip(injected, refs, metadata)
             if not _answer_correct(r.injected_trace.final_answer, ref["answer"])
         ]
         n_failed[depth] = len(failed)
-        f_results = [r for r, _ in failed]
-        f_refs = [ref for _, ref in failed]
+        f_results = [r for r, _, _ in failed]
+        f_refs = [ref for _, ref, _ in failed]
+        f_metadata = [meta for _, _, meta in failed]
 
         truth = [[r.injected_stage.value, r.injected_at_hop] for r in f_results]
         predictions: Dict[str, List[List[Any]]] = {}
@@ -535,7 +599,16 @@ def run_identifiability(
                 diags, f_results, criterion=criterion, hop_tolerance=hop_tolerance
             )
             predictions[name] = [[d.stage.value, d.predicted_hop, d.cost_tokens] for d in diags]
-        raw[depth] = {"truth": truth, "predictions": predictions}
+        raw[depth] = {
+            "truth": truth,
+            "predictions": predictions,
+            "metadata": f_metadata,
+            "requested_depth": depth,
+            "n_eligible": eligible_samples,
+            "n_skipped_short_trace": skipped_short,
+            "n_skipped_base_incorrect": skipped_base_wrong,
+            "n_recovered": len(injected) - len(failed),
+        }
 
         if checkpoint_path:
             _write_checkpoint(checkpoint_path, _snapshot(), checkpoint_extra)
@@ -553,6 +626,9 @@ def _preload_checkpoint(
     n_total: Dict[int, int],
     n_failed: Dict[int, int],
     raw: Dict[int, Dict[str, Any]],
+    n_eligible: Optional[Dict[int, int]] = None,
+    n_skipped_short_trace: Optional[Dict[int, int]] = None,
+    n_skipped_base_incorrect: Optional[Dict[int, int]] = None,
 ) -> set:
     """Load already-computed depths from a *matching* checkpoint; return their set.
 
@@ -568,7 +644,13 @@ def _preload_checkpoint(
     except (OSError, json.JSONDecodeError):
         return set()
 
-    for key in ("max_samples", "propagation_budget", "retriever"):
+    for key in (
+        "max_samples",
+        "propagation_budget",
+        "retriever",
+        "strict_depth",
+        "require_base_correct",
+    ):
         if extra is not None and key in extra and prior.get(key) != extra.get(key):
             return set()  # config differs — do not reuse
 
@@ -582,6 +664,16 @@ def _preload_checkpoint(
     n_total.update(_iload(prior.get("n_total_by_depth", {})))
     n_failed.update(_iload(prior.get("n_failed_by_depth", {})))
     raw.update(_iload(prior.get("raw_by_depth", {})))
+    if n_eligible is not None:
+        n_eligible.update(_iload(prior.get("n_eligible_by_depth", {})))
+    if n_skipped_short_trace is not None:
+        n_skipped_short_trace.update(
+            _iload(prior.get("n_skipped_short_trace_by_depth", {}))
+        )
+    if n_skipped_base_incorrect is not None:
+        n_skipped_base_incorrect.update(
+            _iload(prior.get("n_skipped_base_incorrect_by_depth", {}))
+        )
     return set(raw.keys())
 
 

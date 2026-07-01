@@ -356,13 +356,15 @@ def rescore_identifiability(
     result: Dict[str, Any],
     criterion: str = "stage",
     hop_tolerance: int = 0,
+    require_actual_depth: bool = False,
 ) -> Dict[str, Dict[int, float]]:
     """Recompute per-diagnoser accuracy vs depth from persisted raw diagnoses.
 
     Lets you evaluate an already-run experiment under a *different* criterion
-    (``stage`` / ``hop`` / ``both``) or hop tolerance without re-spending tokens —
-    it reads ``result["raw_by_depth"]`` (written by ``run_identifiability`` when a
-    ``checkpoint_path`` / final JSON is produced).
+    (``stage`` / ``hop`` / ``both``) or hop tolerance without re-spending tokens.
+    When ``require_actual_depth`` is True, only cases whose persisted truth hop
+    equals the depth bucket are scored; this audits older runs whose live injector
+    may have clamped short traces into shallower actual intervention hops.
 
     Returns ``{diagnoser: {depth: accuracy}}``.
     """
@@ -373,14 +375,23 @@ def rescore_identifiability(
         depth = int(depth_str)
         truth = entry.get("truth", [])
         preds_by_name = entry.get("predictions", {})
+        indices = list(range(len(truth)))
+        if require_actual_depth:
+            indices = [
+                i for i in indices
+                if len(truth[i]) >= 2 and int(truth[i][1]) == depth
+            ]
         for name in names:
             preds = preds_by_name.get(name, [])
-            n = min(len(preds), len(truth))
+            valid_indices = [i for i in indices if i < len(preds)]
+            n = len(valid_indices)
             if n == 0:
                 out[name][depth] = 0.0
                 continue
             correct = 0
-            for pred, tru in zip(preds[:n], truth[:n]):
+            for i in valid_indices:
+                pred = preds[i]
+                tru = truth[i]
                 pred_stage, pred_hop = _as_stage(pred[0]), int(pred[1])
                 true_stage, true_hop = _as_stage(tru[0]), int(tru[1])
                 stage_ok = pred_stage == true_stage

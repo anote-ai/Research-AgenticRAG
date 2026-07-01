@@ -83,6 +83,16 @@ Produces the root-cause-attribution-accuracy-vs-injection-depth table per diagno
 plus cost-per-correct-diagnosis and counterfactual recovery, saved to
 `results/identifiability_{provider}_{dataset}.json`.
 
+By default, the identifiability runner now keeps depth buckets strict: a hop-2
+or hop-3 intervention is only applied to base traces that actually reached that
+many hops, and injections are skipped when the unmodified base trace already
+answers incorrectly. The output JSON records `n_eligible_by_depth`,
+`n_skipped_short_trace_by_depth`, `n_skipped_base_incorrect_by_depth`, and
+per-failed-case metadata (`sample_id`, requested depth, actual injected hop,
+intervention type, base/final answers). Use `--allow-short-depth-clamp` or
+`--include-base-failures` only when intentionally reproducing older exploratory
+runs.
+
 ## Benchmark Stats Template
 
 | Metric                      | Value  |

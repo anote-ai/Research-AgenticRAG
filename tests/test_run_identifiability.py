@@ -50,10 +50,43 @@ class TestRawPersistence:
         assert set(res.raw_by_depth.keys()) == {1, 2}
         for depth in (1, 2):
             entry = res.raw_by_depth[depth]
-            assert "truth" in entry and "predictions" in entry
+            assert "truth" in entry and "predictions" in entry and "metadata" in entry
             # One prediction list per diagnoser, aligned with truth length.
             for name in ("rule_based", "propagation_aware"):
                 assert len(entry["predictions"][name]) == len(entry["truth"])
+            assert len(entry["metadata"]) == len(entry["truth"])
+
+    def test_strict_depth_skips_short_base_traces(self):
+        agent = _agent()
+        res = run_identifiability(agent, _samples(), _diagnosers(agent), hops=(2,))
+        assert res.n_total_by_depth[2] == 0
+        assert res.n_failed_by_depth[2] == 0
+        assert res.n_eligible_by_depth[2] == 0
+        assert res.n_skipped_short_trace_by_depth[2] == len(_samples())
+        assert res.raw_by_depth[2]["truth"] == []
+
+    def test_can_reproduce_old_depth_clamp_behavior(self):
+        agent = _agent()
+        res = run_identifiability(
+            agent, _samples(), _diagnosers(agent), hops=(2,), strict_depth=False
+        )
+        assert res.n_total_by_depth[2] > 0
+        assert res.n_skipped_short_trace_by_depth[2] == 0
+
+    def test_skips_base_failures_by_default(self):
+        agent = _agent()
+        bad = [
+            QASample(
+                question="who is the ceo of apple",
+                answer="unobtainable answer",
+                supporting_docs=["who is the ceo of apple tim cook"],
+                hop_count=1,
+                dataset="demo",
+            )
+        ]
+        res = run_identifiability(agent, bad, _diagnosers(agent), hops=(1,))
+        assert res.n_total_by_depth[1] == 0
+        assert res.n_skipped_base_incorrect_by_depth[1] == 1
 
     def test_to_dict_serializable_and_roundtrips_rescore(self):
         agent = _agent()
@@ -64,6 +97,7 @@ class TestRawPersistence:
 
         out = rescore_identifiability(json.loads(s), criterion="stage")
         assert set(out.keys()) == {"rule_based", "propagation_aware"}
+        assert "n_skipped_short_trace_by_depth" in json.loads(s)
 
 
 class TestPerDepthResume:

@@ -487,7 +487,10 @@ mock provider is only a control, not a model of real LLM reasoning.  Fourth,
 the current LLM-as-judge results are sensitive to prompt design and token cost.
 Finally, the dataset adapters rely on available supporting documents or fetched
 Wikipedia passages, so corpus construction quality affects both intervention
-and recovery rates.
+and recovery rates.  The current runner now records actual injected hops and
+skips short base traces by default; older persisted result files should be
+rescored with actual-depth filtering or regenerated before making final
+depth-specific claims.
 
 \section{Conclusion}
 

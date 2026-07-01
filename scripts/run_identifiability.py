@@ -46,13 +46,16 @@ from agenticrag import (
 )
 
 
-def _already_complete(out_path: str, hops) -> bool:
-    """True if *out_path* exists and its raw_by_depth already covers all *hops*."""
+def _already_complete(out_path: str, hops, expected: dict | None = None) -> bool:
+    """True if *out_path* exists and its matching raw_by_depth covers all *hops*."""
     if not os.path.exists(out_path):
         return False
     try:
         with open(out_path) as f:
             prev = json.load(f)
+        for key, value in (expected or {}).items():
+            if prev.get(key) != value:
+                return False
         have = set(prev.get("raw_by_depth", {}).keys())
         return {str(h) for h in hops}.issubset(have)
     except Exception:
@@ -85,6 +88,11 @@ def main() -> None:
                    help="Cap passages per question when fetching FRAMES corpus")
     p.add_argument("--criterion", default="hop", choices=["hop", "stage", "both"])
     p.add_argument("--hop-tolerance", type=int, default=0)
+    p.add_argument("--allow-short-depth-clamp", action="store_true",
+                   help="Allow old behavior where requested depths beyond a base trace's hops "
+                        "are clamped to the final available hop")
+    p.add_argument("--include-base-failures", action="store_true",
+                   help="Inject into base traces even when the original answer is already wrong")
     p.add_argument("--propagation-budget", type=int, default=None,
                    help="Cap re-execution probes for the propagation-aware diagnoser")
     p.add_argument("--tag", default="",
@@ -108,7 +116,17 @@ def main() -> None:
     out_path = os.path.join(
         args.output_dir, f"identifiability_{prov_slug}_{args.dataset}{tag}.json"
     )
-    if args.resume and _already_complete(out_path, args.hops):
+    meta = {
+        "dataset": args.dataset,
+        "provider": provider.name,
+        "retriever": args.retriever,
+        "criterion": args.criterion,
+        "max_samples": args.max_samples,
+        "propagation_budget": args.propagation_budget,
+        "strict_depth": not args.allow_short_depth_clamp,
+        "require_base_correct": not args.include_base_failures,
+    }
+    if args.resume and _already_complete(out_path, args.hops, meta):
         print(f"[resume] {out_path} already covers hops {args.hops} — skipping.")
         return
 
@@ -134,20 +152,13 @@ def main() -> None:
         "propagation_aware": PropagationAwareDiagnoser(agent, max_probes=args.propagation_budget),
     }
 
-    meta = {
-        "dataset": args.dataset,
-        "provider": provider.name,
-        "retriever": args.retriever,
-        "criterion": args.criterion,
-        "max_samples": args.max_samples,
-        "propagation_budget": args.propagation_budget,
-    }
-
     print(f"Running identifiability sweep over hops={args.hops} "
           f"(checkpointing to {out_path} after each depth) ...")
     result = run_identifiability(
         agent, samples, diagnosers,
         hops=args.hops, criterion=args.criterion, hop_tolerance=args.hop_tolerance,
+        strict_depth=not args.allow_short_depth_clamp,
+        require_base_correct=not args.include_base_failures,
         checkpoint_path=out_path, checkpoint_extra=meta, resume=args.resume,
     )
 
@@ -182,6 +193,12 @@ def _print_result(result, args) -> None:
             f"[dim]n (total / failed) by depth: "
             f"{result.n_total_by_depth} / {result.n_failed_by_depth}[/dim]"
         )
+        console.print(
+            f"[dim]eligible / skipped-short / skipped-base-wrong: "
+            f"{result.n_eligible_by_depth} / "
+            f"{result.n_skipped_short_trace_by_depth} / "
+            f"{result.n_skipped_base_incorrect_by_depth}[/dim]"
+        )
     except ImportError:
         print("\n=== RCA vs depth ===")
         for name in result.diagnoser_names:
@@ -189,6 +206,12 @@ def _print_result(result, args) -> None:
             print(f"  {name:20s} {cells}")
         print(f"recovery_by_depth: {result.recovery_rate_by_depth}")
         print(f"n_total/n_failed: {result.n_total_by_depth} / {result.n_failed_by_depth}")
+        print(
+            "eligible/skipped_short/skipped_base_wrong: "
+            f"{result.n_eligible_by_depth} / "
+            f"{result.n_skipped_short_trace_by_depth} / "
+            f"{result.n_skipped_base_incorrect_by_depth}"
+        )
 
 
 if __name__ == "__main__":

@@ -176,6 +176,33 @@ class TestRescore:
         with pytest.raises(ValueError):
             rescore_identifiability(self.RESULT, criterion="bogus")
 
+    def test_require_actual_depth_filters_clamped_truths(self):
+        result = {
+            "diagnosers": ["a"],
+            "raw_by_depth": {
+                "2": {
+                    "truth": [["retrieval", 1], ["retrieval", 2]],
+                    "predictions": {
+                        "a": [["retrieval", 1, 0], ["retrieval", 2, 0]],
+                    },
+                }
+            },
+        }
+        loose = rescore_identifiability(result, criterion="hop")
+        strict = rescore_identifiability(
+            result, criterion="hop", require_actual_depth=True
+        )
+        assert loose["a"][2] == 1.0
+        assert strict["a"][2] == 1.0
+
+        result["raw_by_depth"]["2"]["predictions"]["a"][0][1] = 2
+        loose = rescore_identifiability(result, criterion="hop")
+        strict = rescore_identifiability(
+            result, criterion="hop", require_actual_depth=True
+        )
+        assert loose["a"][2] == 0.5
+        assert strict["a"][2] == 1.0
+
 
 # --------------------------------------------------------------------------- #
 # counterfactual_recovery_rate
