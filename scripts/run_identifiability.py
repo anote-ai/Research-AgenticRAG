@@ -44,6 +44,7 @@ from agenticrag import (
     make_provider,
     run_identifiability,
 )
+from agenticrag.datasets import frames_corpus_stats
 
 
 def _already_complete(out_path: str, hops, expected: dict | None = None) -> bool:
@@ -86,6 +87,8 @@ def main() -> None:
                    help="Build a Wikipedia passage corpus for FRAMES (real retrieval)")
     p.add_argument("--frames-max-passages", type=int, default=40,
                    help="Cap passages per question when fetching FRAMES corpus")
+    p.add_argument("--allow-link-corpus", action="store_true",
+                   help="Suppress the warning when FRAMES is loaded without --frames-fetch-passages")
     p.add_argument("--criterion", default="hop", choices=["hop", "stage", "both"])
     p.add_argument("--hop-tolerance", type=int, default=0)
     p.add_argument("--allow-short-depth-clamp", action="store_true",
@@ -138,6 +141,25 @@ def main() -> None:
     samples = load_dataset(args.dataset, max_samples=args.max_samples, **load_kwargs)
     n_docs = sum(len(s.supporting_docs) for s in samples)
     print(f"  loaded {len(samples)} samples ({n_docs} passages total)")
+
+    corpus_quality: dict = {}
+    if args.dataset == "frames":
+        corpus_quality = frames_corpus_stats(samples)
+        link_frac = corpus_quality.get("link_only_fraction", 0.0)
+        if link_frac > 0.5 and not args.frames_fetch_passages and not args.allow_link_corpus:
+            print(
+                f"\nWARNING: {link_frac:.0%} of FRAMES samples appear to use bare Wikipedia links "
+                "instead of passage text. Results on link-only FRAMES are hard to interpret.\n"
+                "Re-run with --frames-fetch-passages for real retrieval, or pass "
+                "--allow-link-corpus to suppress this warning.\n"
+            )
+        print(
+            f"  FRAMES corpus stats: mean_docs={corpus_quality['mean_docs_per_sample']:.1f}, "
+            f"link_only={corpus_quality['link_only_fraction']:.0%}, "
+            f"answer_recall={corpus_quality['mean_answer_recall_in_corpus']:.2f}, "
+            f"mean_passage_len={corpus_quality['mean_passage_length']:.0f}ch"
+        )
+        meta["corpus_quality"] = corpus_quality
 
     retriever = _make_retriever(args.retriever)
     agent = LLMAgent(provider=provider, retriever=retriever, max_iterations=args.max_iterations)

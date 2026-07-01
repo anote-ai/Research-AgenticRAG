@@ -409,6 +409,129 @@ def rescore_identifiability(
     return out
 
 
+def ancestor_hit(diag: Any, truth: Any) -> bool:
+    """True when the prediction is at or before the true hop and stages match.
+
+    Useful for propagation paths where an early-hop prediction is causal —
+    the diagnoser correctly identified a hop that did contribute to the failure,
+    even if not the exact injected hop.
+    """
+    pred_stage, pred_hop = _diagnosis_pair(diag)
+    true_stage, true_hop = _coerce_truth(truth)
+    return pred_stage == true_stage and 0 < pred_hop <= true_hop
+
+
+def ancestor_hit_rate(diagnoses: Sequence[Any], truths: Sequence[Any]) -> float:
+    """Fraction of diagnoses that hit a causal ancestor (at/before true hop, same stage)."""
+    if len(diagnoses) != len(truths):
+        raise ValueError("diagnoses and truths must have the same length")
+    if not diagnoses:
+        return 0.0
+    return sum(1 for d, t in zip(diagnoses, truths) if ancestor_hit(d, t)) / len(diagnoses)
+
+
+def bootstrap_localization_ci(
+    diagnoses: Sequence[Any],
+    truths: Sequence[Any],
+    criterion: str = "hop",
+    hop_tolerance: int = 0,
+    n_boot: int = 1000,
+    seed: int = 42,
+) -> Dict[str, Any]:
+    """Bootstrap 95% CI for localization accuracy.
+
+    Returns ``{"mean": float, "ci_low": float, "ci_high": float, "n": int}``.
+    Fully deterministic via ``seed``. Small-n conditions (n < 30) naturally
+    produce wide CIs — no additional flag needed to signal low confidence.
+    """
+    import random
+
+    n = len(diagnoses)
+    if n == 0:
+        return {"mean": 0.0, "ci_low": 0.0, "ci_high": 0.0, "n": 0}
+
+    point = localization_accuracy(
+        list(diagnoses), list(truths), criterion=criterion, hop_tolerance=hop_tolerance
+    )
+    rng = random.Random(seed)
+    pairs = list(zip(diagnoses, truths))
+    boot_means: List[float] = []
+    for _ in range(n_boot):
+        sample = rng.choices(pairs, k=n)
+        ds, ts = zip(*sample)
+        boot_means.append(
+            localization_accuracy(list(ds), list(ts), criterion=criterion, hop_tolerance=hop_tolerance)
+        )
+    boot_means.sort()
+    low_idx = max(0, int(0.025 * n_boot))
+    high_idx = min(n_boot - 1, int(0.975 * n_boot))
+    return {
+        "mean": point,
+        "ci_low": boot_means[low_idx],
+        "ci_high": boot_means[high_idx],
+        "n": n,
+    }
+
+
+def slice_identifiability(
+    result: Dict[str, Any],
+    slice_by: str = "intervention_method",
+    criterion: str = "hop",
+    hop_tolerance: int = 0,
+) -> Dict[str, Dict[str, Dict[int, float]]]:
+    """Compute per-diagnoser accuracy sliced by a metadata field.
+
+    Reads the ``raw_by_depth`` block of a persisted result JSON and groups
+    cases by ``slice_by`` (e.g. ``"intervention_method"``,
+    ``"injected_failure_type"``, ``"dataset"``), then scores each diagnoser
+    independently per slice and depth — no LLM re-calls needed.
+
+    Returns ``{slice_value: {diagnoser: {depth: accuracy}}}``.
+    """
+    raw = result.get("raw_by_depth", {})
+    names = result.get("diagnosers", [])
+
+    slices: Dict[str, Dict[int, Dict[str, Any]]] = {}
+    for depth_str, entry in raw.items():
+        depth = int(depth_str)
+        metadata = entry.get("metadata", [])
+        truth = entry.get("truth", [])
+        preds_by_name = entry.get("predictions", {})
+
+        for i, meta in enumerate(metadata):
+            val = str(meta.get(slice_by, "unknown"))
+            slices.setdefault(val, {})
+            slices[val].setdefault(depth, {"truth": [], "predictions": {n: [] for n in names}})
+            if i < len(truth):
+                slices[val][depth]["truth"].append(truth[i])
+            for name in names:
+                preds = preds_by_name.get(name, [])
+                if i < len(preds):
+                    slices[val][depth]["predictions"][name].append(preds[i])
+
+    out: Dict[str, Dict[str, Dict[int, float]]] = {}
+    for val, by_depth in slices.items():
+        out[val] = {n: {} for n in names}
+        for depth, entry in by_depth.items():
+            t = entry["truth"]
+            for name in names:
+                p = entry["predictions"].get(name, [])
+                n_cases = min(len(p), len(t))
+                if n_cases == 0:
+                    out[val][name][depth] = 0.0
+                    continue
+                pred_objs = [
+                    type("_D", (), {"stage": _as_stage(x[0]), "predicted_hop": int(x[1])})()
+                    for x in p[:n_cases]
+                ]
+                truth_pairs = [(_as_stage(x[0]), int(x[1])) for x in t[:n_cases]]
+                out[val][name][depth] = localization_accuracy(
+                    pred_objs, truth_pairs,
+                    criterion=criterion, hop_tolerance=hop_tolerance,
+                )
+    return out
+
+
 def cost_per_correct_diagnosis(
     diagnoses: Sequence[Any],
     truths: Sequence[Any],

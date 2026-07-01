@@ -69,6 +69,9 @@ class Diagnosis:
     predicted_hop: int = 0
     confidence: float = 0.5
     cost_tokens: int = 0
+    # Which probe succeeded: "local_repair" | "suffix_regen" | "none" | "".
+    # Set by SuffixRegenerationDiagnoser; empty for all other diagnosers.
+    probe_type: str = ""
 
     def to_record(self) -> FailureRecord:
         """Adapt to a ``FailureRecord`` so existing RCA metrics apply unchanged.
@@ -403,6 +406,121 @@ class PropagationAwareDiagnoser:
             predicted_hop=hop,
             confidence=0.4,
             cost_tokens=cost,
+        )
+
+
+# --------------------------------------------------------------------------- #
+# C3 variant — suffix-regeneration diagnoser                                    #
+# --------------------------------------------------------------------------- #
+
+class SuffixRegenerationDiagnoser:
+    """Suffix-regeneration variant of the propagation-aware diagnoser.
+
+    Unlike :class:`PropagationAwareDiagnoser`, which holds every hop outside
+    the repaired one fixed (including corrupted later hops), this diagnoser
+    **regenerates the suffix** after repairing hop *h*:
+
+    1. Preserve hops 1 … h-1 exactly.
+    2. Repair hop *h* by clean retrieval from the corpus.
+    3. Call ``agent.resume_from_hops(start_hop=h+1)`` — the agent re-executes
+       from hop h+1 in the repaired context rather than seeing frozen corrupt
+       later hops.
+
+    This recovers root causes whose downstream hops were generated from the
+    corrupted prefix (e.g. hop 2's sub-query was derived from hop 1's wrong
+    answer). Local-only repair misses these because force_answer sees all
+    the corrupted later-hop docs alongside the one repaired doc, confusing
+    the outcome.
+
+    ``Diagnosis.probe_type`` records the localization path:
+    - ``"suffix_regen"`` — suffix regeneration found the flip.
+    - ``"none"`` — no single-hop repair flipped the outcome; coverage heuristic
+      used as fallback.
+    """
+
+    name = "suffix_regen"
+
+    def __init__(
+        self,
+        agent: LLMAgent,
+        corpus: Optional[List[str]] = None,
+        max_probes: Optional[int] = None,
+    ) -> None:
+        self.agent = agent
+        self._corpus = corpus
+        self.max_probes = max_probes
+
+    def diagnose(self, trace: PipelineTrace, reference: Dict[str, Any]) -> Diagnosis:
+        gold = reference.get("answer", "")
+        corpus = reference.get("corpus", self._corpus) or []
+        cost = 0
+
+        if _answer_correct(trace.final_answer, gold):
+            return Diagnosis(
+                trace_id=trace.trace_id,
+                stage=FailureStage.NONE,
+                failure_type=FailureType.SUCCESS,
+                predicted_hop=0,
+                confidence=0.7,
+                cost_tokens=cost,
+                probe_type="",
+            )
+
+        hops = [HopState(query=q, docs=list(d)) for q, d in zip(trace.hop_queries, trace.hop_docs)]
+        n = len(hops)
+        probe_budget = self.max_probes if self.max_probes is not None else n
+
+        for h in range(1, min(n, probe_budget) + 1):
+            # Repair hop h; keep hops 1..h-1 intact as the prefix.
+            repaired_docs = self.agent._retrieve(hops[h - 1].query, corpus)
+            if not repaired_docs:
+                repaired_docs = self.agent._retrieve(trace.query, corpus)
+            prefix = [HopState(query=hh.query, docs=list(hh.docs)) for hh in hops[: h - 1]]
+            prefix.append(HopState(query=hops[h - 1].query, docs=repaired_docs))
+
+            # Regenerate suffix from h+1 — this is the distinguishing step.
+            regen = self.agent.resume_from_hops(
+                trace.query, corpus, prefix=prefix,
+                reference_answer=gold, start_hop=h + 1,
+            )
+            cost += regen.tokens_used
+            if _answer_correct(regen.final_answer, gold):
+                return Diagnosis(
+                    trace_id=trace.trace_id,
+                    stage=FailureStage.RETRIEVAL,
+                    failure_type=FailureType.IRRELEVANT_RETRIEVAL,
+                    predicted_hop=h,
+                    confidence=0.85,
+                    cost_tokens=cost,
+                    probe_type="suffix_regen",
+                )
+
+        # "Continue retrieving" probe — catches premature termination.
+        cont = self.agent.resume_from_hops(
+            trace.query, corpus, prefix=hops, reference_answer=gold, start_hop=n + 1
+        )
+        cost += cont.tokens_used
+        if _answer_correct(cont.final_answer, gold):
+            return Diagnosis(
+                trace_id=trace.trace_id,
+                stage=FailureStage.RETRIEVAL,
+                failure_type=FailureType.EARLY_TERMINATION,
+                predicted_hop=n + 1,
+                confidence=0.75,
+                cost_tokens=cost,
+                probe_type="suffix_regen",
+            )
+
+        # No flip found — coverage heuristic fallback.
+        hop = _earliest_unsupported_hop(trace, gold)
+        return Diagnosis(
+            trace_id=trace.trace_id,
+            stage=FailureStage.RETRIEVAL if hop else FailureStage.ANSWER_GENERATION,
+            failure_type=FailureType.IRRELEVANT_RETRIEVAL if hop else FailureType.INCORRECT_ANSWER,
+            predicted_hop=hop,
+            confidence=0.4,
+            cost_tokens=cost,
+            probe_type="none",
         )
 
 

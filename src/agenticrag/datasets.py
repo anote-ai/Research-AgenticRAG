@@ -619,6 +619,81 @@ _LOADERS = {
 }
 
 
+def frames_corpus_stats(samples: List[QASample]) -> Dict[str, Any]:
+    """Compute corpus quality statistics for a list of QASamples (primarily for FRAMES).
+
+    Returns a dict with:
+    - ``n_samples``: total number of samples.
+    - ``mean_docs_per_sample``: average passages per sample.
+    - ``n_empty_corpus``: samples with zero supporting docs.
+    - ``mean_passage_length``: average characters per passage (0 if no docs).
+    - ``mean_answer_recall_in_corpus``: average fraction of answer tokens
+      found anywhere in the combined passage corpus.
+    - ``link_only_count`` / ``link_only_fraction``: samples whose docs appear
+      to be bare URLs or short titles rather than actual passage text.  A high
+      fraction means the dataset was loaded without ``fetch_passages=True``.
+
+    Use the ``link_only_fraction`` to detect that FRAMES is running on bare
+    Wikipedia links rather than fetched passages — a major caveat for headline
+    FRAMES results.
+    """
+    n = len(samples)
+    if n == 0:
+        return {
+            "n_samples": 0,
+            "mean_docs_per_sample": 0.0,
+            "n_empty_corpus": 0,
+            "mean_passage_length": 0.0,
+            "mean_answer_recall_in_corpus": 0.0,
+            "link_only_count": 0,
+            "link_only_fraction": 0.0,
+        }
+
+    total_docs = 0
+    empty_count = 0
+    total_chars = 0
+    total_doc_count = 0
+    recall_sum = 0.0
+    recall_denom = 0
+    link_only = 0
+
+    for s in samples:
+        docs = s.supporting_docs
+        n_docs = len(docs)
+        total_docs += n_docs
+        if n_docs == 0:
+            empty_count += 1
+            continue
+
+        for doc in docs:
+            total_chars += len(doc)
+            total_doc_count += 1
+
+        corpus_text = " ".join(docs).lower()
+        ans_tokens = set(s.answer.lower().split())
+        if ans_tokens:
+            found = sum(1 for t in ans_tokens if t in corpus_text)
+            recall_sum += found / len(ans_tokens)
+            recall_denom += 1
+
+        is_link_only = all(
+            "http" in doc or " " not in doc.strip() or len(doc.strip()) < 80
+            for doc in docs
+        )
+        if is_link_only:
+            link_only += 1
+
+    return {
+        "n_samples": n,
+        "mean_docs_per_sample": total_docs / n,
+        "n_empty_corpus": empty_count,
+        "mean_passage_length": total_chars / total_doc_count if total_doc_count else 0.0,
+        "mean_answer_recall_in_corpus": recall_sum / recall_denom if recall_denom else 0.0,
+        "link_only_count": link_only,
+        "link_only_fraction": link_only / n,
+    }
+
+
 def load_dataset(
     name: str,
     split: Optional[str] = None,

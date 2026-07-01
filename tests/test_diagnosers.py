@@ -14,6 +14,7 @@ from agenticrag.diagnosers import (
     LLMJudgeDiagnoser,
     PropagationAwareDiagnoser,
     RuleBasedDiagnoser,
+    SuffixRegenerationDiagnoser,
     batch_diagnose,
 )
 from agenticrag.retrievers import TokenOverlapRetriever
@@ -156,6 +157,120 @@ class TestPropagationAware:
         agent = self._agent()
         diag = PropagationAwareDiagnoser(agent, corpus=CORPUS)
         d = diag.diagnose(_wrong_retrieval_trace(), {"answer": GOLD})  # no corpus key
+        assert d.predicted_hop == 1
+
+
+# --------------------------------------------------------------------------- #
+# SuffixRegenerationDiagnoser
+# --------------------------------------------------------------------------- #
+
+def _two_hop_wrong_trace() -> PipelineTrace:
+    """2-hop trace: hop 1 corrupted; hop 2 derived from the corrupt hop-1 context."""
+    return PipelineTrace(
+        query=QUESTION,
+        retrieved_docs=["bananas are yellow", "bananas grow in tropical regions"],
+        tool_calls=[],
+        final_answer="tropical banana",
+        reference_answer=GOLD,
+        hop_queries=[QUESTION, "where do bananas grow"],
+        hop_docs=[["bananas are yellow"], ["bananas grow in tropical regions"]],
+        iterations_used=2,
+    )
+
+
+class _SuffixOnlyAgent:
+    """Controlled agent where suffix regen localizes hop 1 but local repair fails.
+
+    - ``force_answer`` always returns the wrong answer (local repair cannot win).
+    - ``resume_from_hops(start_hop=2)`` returns the gold answer (suffix regen wins).
+    - ``resume_from_hops(start_hop≥3)`` returns wrong (continue-retrieving probe fails).
+    This isolates the suffix-regeneration signal from the local-repair fallback.
+    """
+
+    max_iterations = 3
+
+    def __init__(self):
+        self._inner = LLMAgent(MockProvider(), TokenOverlapRetriever())
+
+    def _retrieve(self, query: str, corpus):
+        return self._inner._retrieve(query, corpus)
+
+    def force_answer(self, query, prefix, reference_answer=""):
+        return PipelineTrace(
+            query=query, retrieved_docs=[], tool_calls=[],
+            final_answer="wrong answer",
+            reference_answer=reference_answer,
+            hop_queries=[], hop_docs=[], iterations_used=1, tokens_used=10,
+        )
+
+    def resume_from_hops(self, query, corpus, prefix, reference_answer="", start_hop=None):
+        answer = reference_answer if (start_hop is not None and start_hop <= 2) else "wrong answer"
+        return PipelineTrace(
+            query=query, retrieved_docs=[], tool_calls=[],
+            final_answer=answer,
+            reference_answer=reference_answer,
+            hop_queries=[], hop_docs=[], iterations_used=1, tokens_used=20,
+        )
+
+
+class TestSuffixRegenerationDiagnoser:
+    def _real_agent(self):
+        return LLMAgent(provider=MockProvider(), retriever=TokenOverlapRetriever(), max_iterations=3)
+
+    def test_correct_trace_is_none(self):
+        agent = self._real_agent()
+        d = SuffixRegenerationDiagnoser(agent).diagnose(_correct_trace(), _ref())
+        assert d.stage == FailureStage.NONE
+        assert d.predicted_hop == 0
+        assert d.probe_type == ""
+
+    def test_localizes_single_hop_fault(self):
+        agent = self._real_agent()
+        d = SuffixRegenerationDiagnoser(agent).diagnose(_wrong_retrieval_trace(), _ref())
+        assert d.stage == FailureStage.RETRIEVAL
+        assert d.predicted_hop == 1
+
+    def test_probe_type_set_on_success(self):
+        agent = self._real_agent()
+        d = SuffixRegenerationDiagnoser(agent).diagnose(_wrong_retrieval_trace(), _ref())
+        # probe_type must be "suffix_regen" or "none" (never blank on failed traces)
+        assert d.probe_type in ("suffix_regen", "none")
+
+    def test_reports_cost(self):
+        agent = self._real_agent()
+        d = SuffixRegenerationDiagnoser(agent).diagnose(_wrong_retrieval_trace(), _ref())
+        assert d.cost_tokens > 0
+
+    def test_corpus_from_constructor_when_absent_in_ref(self):
+        agent = self._real_agent()
+        diag = SuffixRegenerationDiagnoser(agent, corpus=CORPUS)
+        d = diag.diagnose(_wrong_retrieval_trace(), {"answer": GOLD})
+        assert d.predicted_hop == 1
+
+    def test_wins_over_local_repair_on_2hop_trace(self):
+        """Key demo: local-only repair (PropagationAwareDiagnoser) fails but suffix
+        regen (SuffixRegenerationDiagnoser) correctly localizes hop 1."""
+        agent = _SuffixOnlyAgent()
+        trace = _two_hop_wrong_trace()
+        ref = {"answer": GOLD, "corpus": CORPUS}
+
+        # Local-repair diagnoser: force_answer always wrong, continue probe also wrong
+        prop = PropagationAwareDiagnoser(agent).diagnose(trace, ref)
+        # PropagationAwareDiagnoser's continue probe uses start_hop=n+1=3, which our
+        # controlled agent returns "wrong answer" for → falls back to coverage heuristic.
+        assert prop.predicted_hop != 1 or prop.stage != FailureStage.RETRIEVAL or prop.confidence < 0.8
+
+        # Suffix-regen diagnoser: resume_from_hops(start_hop=2) returns gold → hop 1
+        suf = SuffixRegenerationDiagnoser(agent).diagnose(trace, ref)
+        assert suf.predicted_hop == 1
+        assert suf.stage == FailureStage.RETRIEVAL
+        assert suf.probe_type == "suffix_regen"
+
+    def test_existing_pa_diagnoser_behavior_unchanged(self):
+        """PropagationAwareDiagnoser still works correctly on a simple 1-hop fault."""
+        agent = self._real_agent()
+        d = PropagationAwareDiagnoser(agent).diagnose(_wrong_retrieval_trace(), _ref())
+        assert d.stage == FailureStage.RETRIEVAL
         assert d.predicted_hop == 1
 
 

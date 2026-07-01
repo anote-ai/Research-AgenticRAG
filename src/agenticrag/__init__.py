@@ -33,6 +33,10 @@ from .evaluate import (
     attribution_identifiability,
     cost_per_correct_diagnosis,
     rescore_identifiability,
+    ancestor_hit,
+    ancestor_hit_rate,
+    bootstrap_localization_ci,
+    slice_identifiability,
 )
 from .data import make_trace, make_dataset, make_multi_hop_trace, build_knowledge_graph, make_multi_hop_corpus
 from .retrievers import BM25Retriever, TokenOverlapRetriever, DenseRetriever
@@ -44,6 +48,7 @@ from .datasets import (
     load_crag,
     load_dataset,
     iter_batches,
+    frames_corpus_stats,
 )
 from .agents import (
     LLMResponse,
@@ -71,6 +76,7 @@ from .diagnosers import (
     DoctorRAGDiagnoser,
     LLMJudgeDiagnoser,
     PropagationAwareDiagnoser,
+    SuffixRegenerationDiagnoser,
     batch_diagnose,
 )
 from .experiment import (
@@ -120,6 +126,10 @@ __all__ = [
     "attribution_identifiability",
     "cost_per_correct_diagnosis",
     "rescore_identifiability",
+    "ancestor_hit",
+    "ancestor_hit_rate",
+    "bootstrap_localization_ci",
+    "slice_identifiability",
     # Synthetic data
     "make_trace",
     "make_dataset",
@@ -138,6 +148,7 @@ __all__ = [
     "load_crag",
     "load_dataset",
     "iter_batches",
+    "frames_corpus_stats",
     # Real LLM agent
     "LLMResponse",
     "LLMProvider",
@@ -162,6 +173,7 @@ __all__ = [
     "DoctorRAGDiagnoser",
     "LLMJudgeDiagnoser",
     "PropagationAwareDiagnoser",
+    "SuffixRegenerationDiagnoser",
     "batch_diagnose",
     # Ablation experiment runner
     "AblationCell",
