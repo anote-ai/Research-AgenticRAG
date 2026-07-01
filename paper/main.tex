@@ -1,0 +1,565 @@
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{multirow}
+\usepackage{natbib}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\setlength{\emergencystretch}{2em}
+
+\graphicspath{{figures/}{../figures/}{paper/figures/}}
+
+\newcommand{\ours}{\textnormal{\textsc{AgenticRAG-FP}}}
+\newcommand{\dr}{\textnormal{\textsc{Doctor-RAG}}}
+\newcommand{\pa}{\textnormal{\textsc{Propagation-Aware}}}
+\newcommand{\lj}{\textnormal{\textsc{LLM-Judge}}}
+\newcommand{\rb}{\textnormal{\textsc{Rule}}}
+
+\title{When Failures Propagate: Causal Failure Attribution in Agentic Retrieval-Augmented Generation}
+
+\author{
+  Anonymous Authors \\
+  \texttt{Research-AgenticRAG} \\
+  \texttt{author emails}
+}
+
+\date{Draft generated from repository state on July 1, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Agentic retrieval-augmented generation (RAG) systems interleave retrieval,
+reasoning, and answer generation across multiple hops.  This makes failures
+difficult to diagnose: a retrieval error at hop 1 can surface only as a wrong
+answer at hop 3, while later retrieval may partially repair the trajectory.  We
+introduce \ours, a benchmark and experimental framework for causal failure
+attribution in agentic RAG.  \ours{} logs hop-level traces, injects controlled
+faults at specific hops, re-runs the downstream suffix of the agent trajectory,
+and evaluates diagnosers against certified intervention labels.  Across
+HotpotQA, MuSiQue, FRAMES, and CRAG, with Claude, GPT-4o-mini, and local/open
+model conditions, we find a sharp identifiability collapse for coverage-based
+post-hoc diagnosis: mean hop-1 attribution accuracy is 0.93, but mean
+depth-2/3 accuracy falls to 0.30 across 14 real-backbone conditions.  A
+counterfactual propagation-aware localizer improves some narrow MuSiQue
+settings but does not consistently beat the best post-hoc baseline at exact-hop
+localization, winning only 3 of 13 deep conditions.  However, an LLM-as-judge
+diagnoser is comparatively depth-robust, and counterfactual recovery rates show
+that agents often absorb injected retrieval faults.  These results suggest that
+failure propagation is a first-class evaluation axis for agentic RAG, and that
+current local repair probes need stronger causal signals than single-hop
+evidence replacement.
+\end{abstract}
+
+\section{Introduction}
+
+Retrieval-augmented generation (RAG) improves factual question answering by
+conditioning generation on retrieved evidence rather than only on model
+parameters \citep{lewis2020rag}.  Recent agentic variants make retrieval
+iterative: a language model chooses sub-queries, observes retrieved documents,
+and decides whether to search again or answer, in the style of ReAct-like
+reasoning and acting \citep{yao2022react}.  This extra agency is useful for
+multi-hop questions, but it also changes the failure mode.  The observed error
+at the end of a trajectory is often not the root cause.
+
+Consider a three-hop RAG agent.  If hop 1 returns irrelevant evidence, hop 2 may
+drift into a wrong sub-problem, and the final answer may be ungrounded or
+incorrect.  A post-hoc evaluator that only inspects the final trace can label
+the answer as wrong, or identify a late low-coverage hop, while missing the
+earliest causal fault.  Conversely, some agents recover: a bad hop can be
+absorbed by later retrieval and never appear as an end-to-end failure.  Standard
+accuracy, retrieval recall, and answer correctness do not distinguish these
+cases.
+
+This paper studies \emph{failure propagation}: how faults injected at a
+particular hop or stage move through an agentic RAG trajectory, whether the
+agent absorbs them, and whether diagnostic methods can recover the certified
+root cause.  The accompanying repository implements \ours, a provider-agnostic
+agentic RAG benchmark with static and live interventions, hop-level diagnostic
+metrics, and experiment runners for real LLM backbones.
+
+Our current findings are:
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Controlled live intervention is feasible.}  The benchmark
+  corrupts a trajectory prefix at hop $h$ and then re-runs the suffix with the
+  same agent, producing causal labels and genuine downstream reactions rather
+  than deterministic post-hoc edits.
+
+  \item \textbf{Attribution identifiability collapses with propagation depth.}
+  A coverage-gated \dr-style baseline is nearly perfect at hop 1, but falls
+  sharply at depths 2 and 3.  Across 14 real-backbone conditions, mean accuracy
+  drops from 0.93 at hop 1 to 0.30 at deeper hops.
+
+  \item \textbf{The current counterfactual localizer is not yet a general win.}
+  Our \pa{} method beats the best post-hoc baseline in only 3 of 13 deep
+  conditions.  Dense retrieval, a larger probe budget, and larger samples did
+  not remove this gap.
+
+  \item \textbf{Recovery is substantial and dataset-dependent.}  Counterfactual
+  recovery is low on FRAMES, moderate on MuSiQue, and high on HotpotQA in dense
+  OpenAI runs, showing that end-to-end failure rates alone hide both fragility
+  and robustness.
+\end{enumerate}
+
+\section{Related Work}
+
+\paragraph{RAG and active retrieval.}
+RAG combines a parametric generator with external non-parametric memory
+\citep{lewis2020rag}.  Follow-up work studies when and what to retrieve,
+including active retrieval during long-form generation \citep{jiang2023flare}
+and self-reflective retrieval decisions \citep{asai2023selfrag}.  These methods
+aim to improve answers; our work instead treats retrieval and reasoning errors
+as interventions and measures where they propagate.
+
+\paragraph{Agentic RAG diagnosis.}
+ReAct-style agents interleave reasoning and external actions
+\citep{yao2022react}, which creates trajectories that can be inspected,
+localized, and repaired.  \citet{jiao2026doctorrag} propose a diagnose-and-
+repair framework for agentic RAG with coverage-gated localization and prefix
+reuse.  Our \dr{} baseline captures this coverage-gated localization idea, but
+our evaluation asks a causal question: when the true injected root cause is
+known, how often does any diagnoser recover it as propagation depth increases?
+
+\paragraph{Multi-hop and RAG benchmarks.}
+HotpotQA \citep{yang2018hotpotqa} and MuSiQue \citep{trivedi2021musique}
+provide multi-hop QA structure.  FRAMES \citep{krishna2024frames} evaluates
+factuality, retrieval, and reasoning in end-to-end RAG; CRAG
+\citep{yang2024crag} stresses dynamic and long-tail factual QA.  We use these
+datasets as substrates for injected fault trajectories rather than as only
+answer-accuracy benchmarks.
+
+\paragraph{Causal evaluation.}
+The intervention view follows the language of causal inference
+\citep{pearl2009causality}: rather than observing a bad trace and guessing what
+caused it, \ours{} performs $do(\mathrm{failure}=f, \mathrm{hop}=h)$ and scores
+diagnoses against the known intervention.
+
+\section{Task and Trace Model}
+
+Each example is a question-answer pair with a retrieval corpus.  An agent emits
+a trace
+\[
+  \tau = (q, \{q_h, D_h\}_{h=1}^{H}, A, y, c),
+\]
+where $q$ is the user question, $q_h$ is the sub-query at hop $h$, $D_h$ is the
+set of documents retrieved at hop $h$, $A$ is the final answer, $y$ is the
+reference answer, and $c$ is token cost.  The repository implements this as
+\texttt{PipelineTrace}, with flattened retrieved documents, tool calls, hop
+queries, hop documents, iteration count, and token usage.
+
+Failures are labeled by stage:
+\[
+  s \in \{\mathrm{retrieval}, \mathrm{tool}, \mathrm{answer}, \mathrm{none}\}.
+\]
+Retrieval failures include empty retrieval, irrelevant retrieval, query drift,
+false-premise evidence, stale evidence, and early termination.  Answer failures
+include empty answers, incorrect answers, and hallucinations.  A diagnostic
+record stores a predicted stage, failure type, propagation flag, severity, and
+root-cause string.
+
+\section{Interventional Benchmark}
+
+\subsection{Agent}
+
+The real-agent runner, \texttt{LLMAgent}, implements a provider-agnostic
+ReAct-style loop.  At each hop the provider emits either
+\verb|{"action": "search", "query": ...}| or
+\verb|{"action": "answer", "answer": ...}|.  The same loop supports Claude,
+OpenAI-compatible models, and a deterministic mock provider.  Retrieval is
+pluggable: the experiments use BM25, token-overlap, and dense
+\texttt{sentence-transformers} retrieval through one interface.
+
+The important implementation detail is resumability.  Given a prefix of
+executed hops, the agent can resume from hop $h+1$ and continue reasoning.  This
+makes live failure injection possible.
+
+\subsection{Static and Live Interventions}
+
+The static injector edits a completed trace.  This is useful for deterministic
+unit tests and ablations, but it cannot measure how an agent reacts to a fault.
+The live injector instead constructs a corrupted prefix and re-runs the suffix.
+Table~\ref{tab:interventions} summarizes the live interventions.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Intervention & Stage & Operationalization \\
+\midrule
+Empty retrieval & Retrieval & Replace $D_h$ with $\emptyset$ and resume \\
+Irrelevant docs & Retrieval & Replace $D_h$ with off-topic noise documents \\
+Query drift & Retrieval & Replace $q_h$ with a drifted sub-query, retrieve, resume \\
+False premise & Retrieval & Prefix evidence with a confidently wrong premise \\
+Stale evidence & Retrieval & Prefix evidence with outdated temporal evidence \\
+Early termination & Retrieval & Force answer from evidence before hop $h$ \\
+\bottomrule
+\end{tabular}
+\caption{Live interventions in \ours.  All preserve certified labels
+(\texttt{injected\_stage}, \texttt{injected\_failure\_type},
+\texttt{injected\_at\_hop}) while letting the downstream suffix be generated by
+the actual agent.}
+\label{tab:interventions}
+\end{table}
+
+\subsection{Diagnosers}
+
+We compare four diagnosers.
+
+\paragraph{\rb.}
+A rule-based wrapper around \texttt{DiagnosticBenchmark}.  It detects empty
+retrieval, missing tool calls, empty answers, hallucinations by grounding
+overlap, and incorrect answers.  It sees only the final trace.
+
+\paragraph{\dr.}
+A coverage-gated localizer inspired by \dr{}.  It identifies the earliest hop
+whose documents have insufficient token overlap with the gold answer, and
+otherwise attributes the failure to answer generation.
+
+\paragraph{\lj.}
+An LLM-as-judge diagnoser that reads the hop-level trace and predicts the
+earliest failing stage and hop.  With the mock provider it falls back to a
+deterministic coverage heuristic; with real providers it incurs token cost.
+
+\paragraph{\pa.}
+An active counterfactual diagnoser.  For each hop in causal order, it repairs
+that hop's evidence by re-retrieving from the corpus, forces the agent to answer
+from the repaired full prefix, and returns the earliest hop whose repair flips a
+wrong answer to a correct answer.  It also probes whether continuing retrieval
+would repair a premature answer.  The method is explicitly more expensive
+because it spends re-execution tokens.
+
+\section{Metrics}
+
+\paragraph{Attribution identifiability.}
+For injected traces that still fail after the intervention, we score whether a
+diagnoser predicts the correct injected hop:
+\[
+  \mathrm{Acc}_d(h) =
+  \frac{1}{|\mathcal{F}_h|}
+  \sum_{\tau_i \in \mathcal{F}_h}
+  \mathbf{1}[\hat{h}_{d,i} = h_i],
+\]
+where $\mathcal{F}_h$ contains injected traces at depth $h$ whose final answer is
+incorrect after suffix re-execution.  The main C2 curve is
+$\mathrm{Acc}_d(h)$ versus injection depth.
+
+\paragraph{Counterfactual recovery.}
+Recovery is the fraction of live interventions whose corrupted trajectory still
+produces a correct answer:
+\[
+  \mathrm{Recovery}(h) =
+  \Pr[\mathrm{correct}(A, y) \mid do(f, h)].
+\]
+Recovered traces are excluded from root-cause scoring because there is no final
+failure to attribute.
+
+\paragraph{Cost per correct diagnosis.}
+For token-spending diagnosers, we report total tokens divided by the number of
+correct localizations.  This separates diagnosis quality from deployability.
+
+\paragraph{Static propagation graph.}
+For static ablations, \texttt{PropagationGraph} estimates empirical stage
+coupling $P(s_{h+1}=t \mid s_h=s)$, mean propagation depth, critical path, and
+self-correction rate.
+
+\section{Experimental Setup}
+
+\paragraph{Datasets.}
+The repository supports HotpotQA, MuSiQue, FRAMES, and CRAG.  HotpotQA and
+MuSiQue serve as anchor multi-hop QA datasets.  FRAMES supplies variable-depth
+RAG questions and Wikipedia passage caches.  CRAG contributes dynamic,
+long-tail, and false-premise style examples.
+
+\paragraph{Backbones and retrievers.}
+The real-backbone runs currently include Claude Haiku 4.5, GPT-4o-mini, and
+OpenAI-compatible local models such as Qwen2.5:7B.  Retrieval conditions include
+BM25 \citep{robertson2009bm25} and dense retrieval with budget-4
+propagation-aware probes.  Static controls use BM25 and token-overlap.
+
+\paragraph{Interventions.}
+The headline identifiability experiment injects retrieval-family faults at hops
+1, 2, and 3 using empty retrieval, irrelevant retrieval, false premise, and
+stale evidence.  For each sample and depth, all interventions are applied to the
+same base trace, then the downstream suffix is re-executed.
+
+\paragraph{Current result snapshot.}
+The tables below summarize results present in \texttt{results/} as of July 1,
+2026.  The phase-2 master log did not append a final completion line, but
+result JSONs and \texttt{RESULTS\_SUMMARY.md} were regenerated after the latest
+dense Claude files.  Dense Claude HotpotQA is partial in the persisted JSON
+(hop 1 only), and dense Claude MuSiQue contains hops 1--2.
+
+\section{Results}
+
+\subsection{C2: Attribution Identifiability Collapses with Depth}
+
+Across 14 real-backbone conditions, the \dr{} coverage localizer is almost
+perfect at the injection hop but degrades after propagation.  Table
+\ref{tab:doctor-collapse} reproduces the aggregate from the current results
+summary.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Condition family & Mean hop 1 & Mean hop 2/3 & Drop \\
+\midrule
+\dr{} coverage baseline, 14 real conditions & 0.93 & 0.30 & 0.63 \\
+\bottomrule
+\end{tabular}
+\caption{Headline C2 result: coverage-gated root-cause attribution is high at
+the injection hop but collapses once the same fault propagates to later hops.
+The mean is over real-backbone conditions in \texttt{RESULTS\_SUMMARY.md}.}
+\label{tab:doctor-collapse}
+\end{table}
+
+Figure~\ref{fig:curves} shows representative identifiability curves.  FRAMES is
+especially severe: for Claude with BM25, \dr{} falls from 1.00 at hop 1 to 0.03
+at hops 2--3, while \pa{} also collapses from 0.84 to 0.17 and 0.06.  On dense
+OpenAI MuSiQue, the collapse is milder and \pa{} narrowly outperforms the best
+post-hoc baseline at deep hops.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.48\linewidth]{identifiability_curve_claude_claude-haiku-4-5_frames.pdf}
+\hfill
+\includegraphics[width=0.48\linewidth]{identifiability_curve_openai_gpt-4o-mini_musique.pdf}
+\caption{Representative attribution-identifiability curves from generated
+figures.  Left: Claude Haiku 4.5 on FRAMES with BM25.  Right: GPT-4o-mini on
+MuSiQue with BM25.  Each curve reports exact-hop attribution accuracy among
+injected traces that remain failed after live suffix re-execution.}
+\label{fig:curves}
+\end{figure}
+
+\subsection{C3: Counterfactual Local Repair is Mixed}
+
+The \pa{} diagnoser was designed to recover causal roots that post-hoc methods
+cannot see.  The current exact-hop evidence does not support this as a general
+claim.  Table~\ref{tab:c3-verdict} summarizes the depth-$\geq 2$ comparison
+against the best post-hoc baseline.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{p{0.43\linewidth}ccc}
+\toprule
+Evaluation slice & Conditions & \pa{} wins & Interpretation \\
+\midrule
+Depth $\geq 2$, real backbones & 13 & 3 & Not supported overall \\
+Dense + budget 4 strengthened runs & 3 deep-evaluable anchors & 1 & MuSiQue only \\
+\bottomrule
+\end{tabular}
+\caption{Current C3 verdict.  The propagation-aware localizer wins in narrow
+MuSiQue settings, but loses most real-backbone deep conditions, including
+strengthened dense runs.}
+\label{tab:c3-verdict}
+\end{table}
+
+Table~\ref{tab:dense-openai} shows the strengthened dense GPT-4o-mini runs with
+larger sample size and probe budget 4.  Dense retrieval raises recovery and
+keeps \pa{} competitive, but \dr{} remains stronger on HotpotQA depth 2--3, and
+\lj{} is competitive or better on MuSiQue depth 2.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{llcccc}
+\toprule
+Dataset & Depth & \dr{} & \lj{} & \pa{} & Recovery \\
+\midrule
+\multirow{3}{*}{HotpotQA, dense}
+  & 1 & 1.00 & 0.35 & 0.61 & 0.69 \\
+  & 2 & 0.55 & 0.47 & 0.53 & 0.69 \\
+  & 3 & 0.52 & 0.33 & 0.46 & 0.71 \\
+\midrule
+\multirow{3}{*}{MuSiQue, dense}
+  & 1 & 1.00 & 0.50 & 0.61 & 0.50 \\
+  & 2 & 0.46 & 0.57 & 0.53 & 0.53 \\
+  & 3 & 0.43 & 0.46 & 0.53 & 0.56 \\
+\bottomrule
+\end{tabular}
+\caption{Strengthened GPT-4o-mini dense results, criterion = exact hop.  Each
+depth has 240 total live interventions before filtering recovered traces.}
+\label{tab:dense-openai}
+\end{table}
+
+\subsection{LLM-Judge is More Depth-Robust than Coverage Gating}
+
+The current results summary reports that \dr{} usually drops sharply from hop 1
+to deeper hops, while \lj{} is comparatively flat.  For example, on Claude
+MuSiQue dense, \dr{} drops from 1.00 to 0.12 by hop 2, whereas \lj{} rises from
+0.16 to 0.76.  On OpenAI FRAMES dense, \dr{} drops from 0.98 to 0.03 by hop 2,
+whereas \lj{} remains around 0.64.  This suggests that reasoning over the full
+trajectory can be more robust to propagation than simple gold-answer coverage,
+although it incurs token cost and can still mislocalize.
+
+\subsection{Recovery is a First-Class Outcome}
+
+Table~\ref{tab:recovery} shows selected counterfactual recovery rates.  Recovery
+is computed before filtering failed traces for attribution.  This makes it a
+separate robustness axis: high recovery means the injected fault did not cause a
+final error.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{p{0.58\linewidth}ccc}
+\toprule
+Condition & Hop 1 & Hop 2 & Hop 3 \\
+\midrule
+OpenAI GPT-4o-mini, HotpotQA, dense & 0.69 & 0.69 & 0.71 \\
+OpenAI GPT-4o-mini, MuSiQue, dense & 0.50 & 0.53 & 0.56 \\
+OpenAI GPT-4o-mini, FRAMES, dense & 0.20 & 0.18 & -- \\
+Claude Haiku 4.5, FRAMES, BM25 & 0.26 & 0.28 & 0.23 \\
+Qwen2.5:7B, MuSiQue, BM25 & 0.25 & 0.20 & 0.17 \\
+\bottomrule
+\end{tabular}
+\caption{Counterfactual recovery by depth for selected conditions.  Agents can
+often absorb retrieval faults, especially on HotpotQA, while FRAMES remains
+fragile.}
+\label{tab:recovery}
+\end{table}
+
+\subsection{Static Control: Propagation Masks Retrieval Roots}
+
+The static ablation grid gives a deterministic control over HotpotQA and
+MuSiQue with BM25 and token-overlap retrievers.  It shows the same masking
+pattern in a simpler setting.  On BM25 HotpotQA, empty retrieval at hop 1 is
+diagnosed as retrieval with root-cause accuracy 1.00, but empty retrieval at
+hops 2 and 3 is diagnosed as answer-generation failure with root-cause accuracy
+0.00.  On BM25 MuSiQue, the pattern repeats: hop-1 empty retrieval has
+root-cause accuracy 1.00, while hops 2 and 3 have 0.00.  The static propagation
+graph estimates retrieval-to-answer coupling of 0.82 on HotpotQA and 0.94 on
+MuSiQue for empty retrieval.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.72\linewidth]{benchmark_table_root_cause_accuracy.pdf}
+\caption{Generated benchmark table for root-cause accuracy in the static
+ablation suite.  Static controls are not the headline causal experiment, but
+they provide a cheap regression test for propagation masking.}
+\label{fig:static-table}
+\end{figure}
+
+\section{Discussion}
+
+\paragraph{Why coverage collapses.}
+Coverage gating assumes the earliest low-support hop is the root cause.  Once
+the agent re-runs the suffix, later hops can either mask the original fault or
+create new low-support evidence.  The final trace no longer carries a reliable
+signature of the injected hop.  The observed collapse is therefore an
+identifiability limit, not just a weak implementation.
+
+\paragraph{Why the current \pa{} method underperforms.}
+The current \pa{} probe repairs one hop at a time and forces an answer from the
+modified hop sequence.  This is a strong causal idea but a weak localizer when
+multiple downstream artifacts depend on the original fault.  Repairing hop $h$
+while holding later corrupted hops fixed may not flip the answer even when $h$
+was the true cause.  Conversely, repairing a later answer-bearing hop can flip
+the outcome and steal credit from the earlier cause.  This explains the gap
+between exact-hop scoring and the looser stage criterion, where \pa{} often
+looks much stronger.
+
+\paragraph{Implications for repair.}
+The negative C3 result is useful.  It suggests that deployable repair should not
+only ask ``which hop flips if repaired?'' but should model paths of downstream
+dependence.  Candidate next steps are multi-hop repair sets, structural
+counterfactuals that regenerate downstream hops after each repair, explicit
+query-drift detection, and confidence-calibrated abstention when several hops
+are causally entangled.
+
+\section{Limitations}
+
+First, several result files are partial.  Dense Claude HotpotQA currently
+contains only hop 1; dense Claude MuSiQue contains hops 1--2.  Second, scoring
+uses exact-hop localization as the strict headline criterion.  Stage-level
+diagnosis is easier and yields different conclusions for \pa{}.  Third, the
+mock provider is only a control, not a model of real LLM reasoning.  Fourth,
+the current LLM-as-judge results are sensitive to prompt design and token cost.
+Finally, the dataset adapters rely on available supporting documents or fetched
+Wikipedia passages, so corpus construction quality affects both intervention
+and recovery rates.
+
+\section{Conclusion}
+
+\ours{} turns agentic RAG failure analysis into an intervention problem.  By
+injecting faults at known hops and re-running the downstream suffix, it separates
+three phenomena that end-to-end accuracy conflates: whether a fault causes a
+final failure, whether the agent recovers, and whether a diagnoser can recover
+the certified root cause.  The current experiments strongly support the
+identifiability-collapse claim and show substantial counterfactual recovery.
+They do not yet support a broad exact-hop advantage for the current
+propagation-aware diagnoser.  The next version of the method should treat
+propagation as a path-localization problem rather than a single-hop repair
+probe.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\appendix
+
+\section{Implementation Notes}
+
+The core repository files corresponding to the paper are:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{src/agenticrag/core.py}: trace schema, failure taxonomy,
+  heuristic pipeline, and rule-based diagnostic benchmark.
+  \item \texttt{src/agenticrag/agents.py}: provider-agnostic resumable LLM
+  agent and token accounting.
+  \item \texttt{src/agenticrag/injection.py}: static and live interventions.
+  \item \texttt{src/agenticrag/diagnosers.py}: rule-based, coverage-gated,
+  LLM-judge, and propagation-aware diagnosers.
+  \item \texttt{src/agenticrag/experiment.py}: ablation and identifiability
+  runners with checkpointing.
+  \item \texttt{src/agenticrag/evaluate.py} and
+  \texttt{src/agenticrag/propagation.py}: metrics and propagation graph.
+\end{itemize}
+
+\section{Reproduction Commands}
+
+\begin{verbatim}
+# Offline smoke:
+python scripts/run_identifiability.py --dataset frames --provider mock \
+  --retriever bm25 --hops 1 2 3
+
+# Real-backbone identifiability:
+python scripts/run_identifiability.py --dataset musique --provider openai \
+  --model gpt-4o-mini --retriever dense --max-samples 60 \
+  --hops 1 2 3 --propagation-budget 4 --tag dense_b4 --resume
+
+# Static controls:
+python scripts/run_baseline.py --all-conditions --max-samples 500
+python scripts/run_ablation.py --all-conditions --max-samples 200 --hops 1 2 3
+
+# Figures:
+python scripts/plot_identifiability.py
+python scripts/plot_amplification.py --input results/ablation_all.json
+\end{verbatim}
+
+\section{Additional Current Results}
+
+The generated \texttt{results/RESULTS\_SUMMARY.md} contains the full current
+condition table.  Selected exact-hop deep comparisons from that file are:
+\begin{itemize}[leftmargin=*]
+  \item \pa{} beats the best baseline on Claude HotpotQA BM25, OpenAI MuSiQue
+  BM25, and OpenAI MuSiQue dense.
+  \item \pa{} loses on Claude/OpenAI FRAMES, Claude/OpenAI CRAG, OpenAI
+  HotpotQA dense, OpenAI HotpotQA BM25, Claude MuSiQue dense, and Qwen2.5:7B
+  MuSiQue BM25.
+  \item Stage-criterion rescoring is much more favorable to \pa{}: examples
+  include 0.96 on Claude FRAMES BM25, 0.88 on Claude MuSiQue dense, 0.87 on
+  OpenAI FRAMES dense, and 0.81 on OpenAI MuSiQue BM25.  This suggests that
+  \pa{} often identifies the broad failure stage but not the exact injected
+  hop.
+\end{itemize}
+
+\end{document}

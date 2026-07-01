@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
+from .agents import HopState, LLMAgent
 from .core import DiagnosticBenchmark, FailureStage, FailureType, PipelineTrace
 
 
@@ -168,6 +169,221 @@ class FailureInjector:
             injected_failure_type=FailureType.HALLUCINATION,
             injected_at_hop=0,
         )
+
+
+# --------------------------------------------------------------------------- #
+# Live (interventional) injection — W2                                          #
+# --------------------------------------------------------------------------- #
+
+# Off-topic documents used as irrelevant replacements.  Chosen to have near-zero
+# token overlap with any realistic QA corpus.
+_LIVE_NOISE_DOCS: List[str] = [
+    "Xylophones are percussion instruments with wooden bars.",
+    "The migration patterns of Arctic terns span both polar regions.",
+    "Fermentation converts sugars into ethanol under anaerobic conditions.",
+]
+# A confidently-stated but wrong premise (CRAG-style false-premise trigger).
+_DEFAULT_FALSE_PREMISE = (
+    "Established fact: the entity in question does not exist and the premise of "
+    "the query is false, so no specific answer applies."
+)
+# Outdated evidence that contradicts the current ground truth (temporal trigger).
+_DEFAULT_STALE_EVIDENCE = (
+    "According to an outdated record that has since been superseded, the "
+    "previously reported value no longer reflects the current state."
+)
+
+
+class LiveFailureInjector:
+    """Injection as causal intervention: inject-then-re-run-the-suffix (W2).
+
+    Where :class:`FailureInjector` statically edits a finished trace, this class
+    corrupts the trajectory *prefix* at a chosen hop and then lets a real
+    :class:`~agenticrag.agents.LLMAgent` continue from there — so the downstream
+    trace is the agent's genuine reaction (it may self-correct, drift further, or
+    collapse), not a deterministic edit.  This is the ``do(failure = f at stage
+    s, hop h)`` operator from contribution C1.
+
+    Every method returns an :class:`InjectionResult` with the same ground-truth
+    schema (``injected_stage`` / ``injected_failure_type`` / ``injected_at_hop``)
+    used by the static injector, so the certified-label dataset and the RCA
+    metrics are computed identically across the static control and the live arm.
+
+    Parameters
+    ----------
+    agent:
+        A resumable :class:`~agenticrag.agents.LLMAgent`.
+    noise_docs / false_premise / stale_evidence:
+        Defaults for the corresponding interventions; override per-call.
+    """
+
+    def __init__(
+        self,
+        agent: LLMAgent,
+        noise_docs: Optional[List[str]] = None,
+        false_premise: Optional[str] = None,
+        stale_evidence: Optional[str] = None,
+    ) -> None:
+        self.agent = agent
+        self.noise_docs = list(noise_docs) if noise_docs else list(_LIVE_NOISE_DOCS)
+        self.false_premise = false_premise or _DEFAULT_FALSE_PREMISE
+        self.stale_evidence = stale_evidence or _DEFAULT_STALE_EVIDENCE
+
+    # -- helpers ------------------------------------------------------------ #
+
+    @staticmethod
+    def _hops(trace: PipelineTrace) -> List[HopState]:
+        return [
+            HopState(query=q, docs=list(d))
+            for q, d in zip(trace.hop_queries, trace.hop_docs)
+        ]
+
+    @staticmethod
+    def _clamp(hop: int, n_hops: int) -> int:
+        return max(1, min(hop, max(1, n_hops)))
+
+    def _hop_query(self, hops: List[HopState], hop: int, trace: PipelineTrace) -> str:
+        idx = hop - 1
+        if 0 <= idx < len(hops):
+            return hops[idx].query
+        return hops[-1].query if hops else trace.query
+
+    def _resume(
+        self,
+        trace: PipelineTrace,
+        corpus: List[str],
+        prefix: List[HopState],
+        hop: int,
+        failure_type: FailureType,
+        stage: FailureStage = FailureStage.RETRIEVAL,
+    ) -> InjectionResult:
+        injected = self.agent.resume_from_hops(
+            trace.query,
+            corpus,
+            prefix=prefix,
+            reference_answer=trace.reference_answer,
+            start_hop=hop + 1,
+        )
+        injected.trace_id = trace.trace_id  # preserve identity for paired analysis
+        return InjectionResult(
+            original_trace_id=trace.trace_id,
+            injected_trace=injected,
+            injected_stage=stage,
+            injected_failure_type=failure_type,
+            injected_at_hop=hop,
+        )
+
+    # -- retrieval-stage interventions ------------------------------------- #
+
+    def inject_empty_retrieval(
+        self, trace: PipelineTrace, corpus: List[str], hop: int = 1
+    ) -> InjectionResult:
+        """Retrieval returns nothing at *hop*; the agent must react and continue."""
+        hops = self._hops(trace)
+        hop = self._clamp(hop, len(hops))
+        q = self._hop_query(hops, hop, trace)
+        prefix = hops[: hop - 1] + [HopState(query=q, docs=[])]
+        return self._resume(trace, corpus, prefix, hop, FailureType.EMPTY_RETRIEVAL)
+
+    def inject_irrelevant_docs(
+        self,
+        trace: PipelineTrace,
+        corpus: List[str],
+        hop: int = 1,
+        noise_docs: Optional[List[str]] = None,
+    ) -> InjectionResult:
+        """Retrieval returns off-topic docs at *hop* (retrieval drift)."""
+        hops = self._hops(trace)
+        hop = self._clamp(hop, len(hops))
+        q = self._hop_query(hops, hop, trace)
+        prefix = hops[: hop - 1] + [HopState(query=q, docs=list(noise_docs or self.noise_docs))]
+        return self._resume(trace, corpus, prefix, hop, FailureType.IRRELEVANT_RETRIEVAL)
+
+    def inject_query_drift(
+        self,
+        trace: PipelineTrace,
+        corpus: List[str],
+        hop: int = 1,
+        drift_query: Optional[str] = None,
+    ) -> InjectionResult:
+        """Corrupt the *hop* sub-query (~ over-extension), then re-retrieve and continue.
+
+        The agent's reformulation is replaced with a drifted query; retrieval
+        runs on the corrupted query, and the agent reasons over whatever that
+        returns — modelling a self-inflicted reformulation error.
+        """
+        hops = self._hops(trace)
+        hop = self._clamp(hop, len(hops))
+        base_q = self._hop_query(hops, hop, trace)
+        if drift_query is None:
+            drift_query = f"{base_q} unrelated tangent xylophone arctic fermentation"
+        drifted_docs = self.agent._retrieve(drift_query, corpus)
+        prefix = hops[: hop - 1] + [HopState(query=drift_query, docs=drifted_docs)]
+        return self._resume(trace, corpus, prefix, hop, FailureType.QUERY_DRIFT)
+
+    def inject_false_premise(
+        self,
+        trace: PipelineTrace,
+        corpus: List[str],
+        hop: int = 1,
+        premise: Optional[str] = None,
+    ) -> InjectionResult:
+        """Inject a confidently-wrong premise into *hop* evidence (CRAG false-premise)."""
+        hops = self._hops(trace)
+        hop = self._clamp(hop, len(hops))
+        q = self._hop_query(hops, hop, trace)
+        base_docs = list(hops[hop - 1].docs) if hop - 1 < len(hops) else []
+        prefix = hops[: hop - 1] + [HopState(query=q, docs=[premise or self.false_premise] + base_docs)]
+        return self._resume(trace, corpus, prefix, hop, FailureType.FALSE_PREMISE)
+
+    def inject_stale_evidence(
+        self,
+        trace: PipelineTrace,
+        corpus: List[str],
+        hop: int = 1,
+        stale: Optional[str] = None,
+    ) -> InjectionResult:
+        """Inject outdated/temporally-wrong evidence into *hop* (CRAG temporal trigger)."""
+        hops = self._hops(trace)
+        hop = self._clamp(hop, len(hops))
+        q = self._hop_query(hops, hop, trace)
+        base_docs = list(hops[hop - 1].docs) if hop - 1 < len(hops) else []
+        prefix = hops[: hop - 1] + [HopState(query=q, docs=[stale or self.stale_evidence] + base_docs)]
+        return self._resume(trace, corpus, prefix, hop, FailureType.STALE_EVIDENCE)
+
+    def inject_early_termination(
+        self, trace: PipelineTrace, corpus: List[str], hop: int = 1
+    ) -> InjectionResult:
+        """Force the agent to answer from evidence up to *hop*-1 (premature collapse).
+
+        ``corpus`` is unused (no further retrieval happens) but kept in the
+        signature so all live interventions share one call shape.
+        """
+        hops = self._hops(trace)
+        hop = self._clamp(hop, len(hops))
+        prefix = hops[: hop - 1]
+        injected = self.agent.force_answer(
+            trace.query, prefix=prefix, reference_answer=trace.reference_answer
+        )
+        injected.trace_id = trace.trace_id
+        return InjectionResult(
+            original_trace_id=trace.trace_id,
+            injected_trace=injected,
+            injected_stage=FailureStage.RETRIEVAL,
+            injected_failure_type=FailureType.EARLY_TERMINATION,
+            injected_at_hop=hop,
+        )
+
+
+# Live interventions keyed by short name — for experiment grids.
+LIVE_INJECTIONS: List[str] = [
+    "inject_empty_retrieval",
+    "inject_irrelevant_docs",
+    "inject_query_drift",
+    "inject_false_premise",
+    "inject_stale_evidence",
+    "inject_early_termination",
+]
 
 
 # --------------------------------------------------------------------------- #

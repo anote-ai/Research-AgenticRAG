@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import string
 import uuid
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -27,6 +29,11 @@ class FailureType(str, Enum):
     OVER_RETRIEVAL = "over_retrieval"     # exhausted iteration budget without satisfying query
     CONTEXT_OVERFLOW = "context_overflow" # retrieved docs exceed context window
     IRRELEVANT_RETRIEVAL = "irrelevant_retrieval"  # docs retrieved but off-topic
+    # Live-intervention failures (W2): the agent reacts to these for real
+    QUERY_DRIFT = "query_drift"           # corrupted reformulation (~ over-extension)
+    EARLY_TERMINATION = "early_termination"  # answered before gathering evidence (~ premature collapse)
+    FALSE_PREMISE = "false_premise"       # misleading premise injected into evidence (CRAG-style)
+    STALE_EVIDENCE = "stale_evidence"     # outdated/temporally-wrong evidence injected
     # No failure
     SUCCESS = "success"
 
@@ -42,6 +49,9 @@ class PipelineTrace(BaseModel):
     hop_queries: List[str] = Field(default_factory=list)
     hop_docs: List[List[str]] = Field(default_factory=list)
     iterations_used: int = 1
+    # Total LLM tokens consumed producing this trace (0 for the heuristic
+    # control pipeline). Used for the cost-aware deployability metrics.
+    tokens_used: int = 0
 
 
 class FailureRecord(BaseModel):
@@ -91,6 +101,41 @@ class KnowledgeGraph(BaseModel):
             if node:
                 facts.extend(node.facts)
         return facts
+
+
+_ARTICLES = re.compile(r"\b(a|an|the)\b")
+_PUNCT = re.compile(r"[" + re.escape(string.punctuation) + r"]")
+
+
+def _normalize_answer(s: str) -> str:
+    """SQuAD-style answer normalization: lowercase, strip articles and punctuation."""
+    s = s.lower()
+    s = _ARTICLES.sub(" ", s)
+    s = _PUNCT.sub(" ", s)
+    return " ".join(s.split())
+
+
+def _token_recall(prediction: str, reference: str) -> float:
+    """Fraction of reference tokens found in prediction tokens."""
+    ref_toks = set(_normalize_answer(reference).split())
+    pred_toks = set(_normalize_answer(prediction).split())
+    if not ref_toks:
+        return 1.0
+    return len(ref_toks & pred_toks) / len(ref_toks)
+
+
+def _answer_correct(prediction: str, reference: str, min_recall: float = 0.8) -> bool:
+    """Return True when prediction matches reference via EM or token recall ≥ min_recall.
+
+    Uses SQuAD-style normalization.  Token recall ≥ 0.8 treats extractive
+    answers (which contain the gold span inside a longer sentence) as correct,
+    matching standard multi-hop QA evaluation practice.
+    """
+    pred_n = _normalize_answer(prediction)
+    ref_n = _normalize_answer(reference)
+    if pred_n == ref_n:
+        return True
+    return _token_recall(prediction, reference) >= min_recall
 
 
 def _token_overlap(a: str, b: str) -> float:
@@ -223,17 +268,11 @@ class DiagnosticBenchmark:
                 root_cause="No tool calls made",
                 severity=0.7,
             )
-        elif trace.iterations_used >= max_iter and trace.final_answer.strip() == "":
-            # Exhausted the hop budget without producing an answer
-            return FailureRecord(
-                trace_id=trace.trace_id,
-                stage=FailureStage.RETRIEVAL,
-                failure_type=FailureType.OVER_RETRIEVAL,
-                propagated=True,
-                root_cause="Iteration budget exhausted without a satisfying answer",
-                severity=0.75,
-            )
         elif trace.final_answer.strip() == "":
+            # In the current extractive pipeline, a non-empty retrieved_docs
+            # always yields a non-empty answer, so an empty answer with docs
+            # present can only result from explicit injection (inject_empty_answer).
+            # Classify all empty-answer cases as ANSWER_GENERATION/EMPTY_ANSWER.
             return FailureRecord(
                 trace_id=trace.trace_id,
                 stage=FailureStage.ANSWER_GENERATION,
@@ -251,7 +290,7 @@ class DiagnosticBenchmark:
                 root_cause="Answer not grounded in retrieved documents",
                 severity=0.65,
             )
-        elif trace.final_answer != reference.get("answer", ""):
+        elif not _answer_correct(trace.final_answer, reference.get("answer", "")):
             return FailureRecord(
                 trace_id=trace.trace_id,
                 stage=FailureStage.ANSWER_GENERATION,

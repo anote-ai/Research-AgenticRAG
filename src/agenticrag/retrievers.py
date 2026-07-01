@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 
 class TokenOverlapRetriever:
@@ -96,3 +96,67 @@ class BM25Retriever:
             ranked = sorted(zip(self._corpus, scores), key=lambda x: -x[1])
 
         return ranked[:top_k]
+
+
+class DenseRetriever:
+    """Dense bi-encoder retriever using sentence-transformers (cosine similarity).
+
+    Provides the same ``retrieve(query, corpus, top_k) -> [(doc, score), ...]``
+    interface as ``BM25Retriever`` so it drops into ``LLMAgent`` /
+    ``AgenticRAGPipeline`` unchanged. Embeddings for a corpus are cached by
+    object identity so re-querying the same corpus across hops does not re-encode.
+
+    Falls back to token-overlap scoring when ``sentence-transformers`` is not
+    installed, keeping the package importable and tests runnable offline. Scores
+    are non-negative so the ``score > 0`` relevance gate in the pipelines behaves
+    consistently with BM25.
+    """
+
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
+        self.model_name = model_name
+        self._model: Any = None
+        self._available = False
+        self._cache_key: Optional[int] = None
+        self._cache_emb: Any = None
+        try:
+            from sentence_transformers import SentenceTransformer  # type: ignore
+
+            self._model = SentenceTransformer(model_name)
+            self._available = True
+        except Exception:  # ImportError or model-download failure
+            self._available = False
+
+    def _encode(self, texts: List[str]) -> Any:
+        import numpy as np  # local import; numpy is a hard dependency
+
+        emb = self._model.encode(texts, convert_to_numpy=True, normalize_embeddings=True)
+        return np.asarray(emb, dtype="float32")
+
+    def retrieve(
+        self, query: str, corpus: Optional[List[str]] = None, top_k: int = 5
+    ) -> List[Tuple[str, float]]:
+        if not corpus:
+            return []
+
+        if not self._available:
+            # Deterministic offline fallback: Jaccard token overlap.
+            q_toks = set(query.lower().split())
+            ranked = []
+            for doc in corpus:
+                d_toks = set(doc.lower().split())
+                union = q_toks | d_toks
+                ranked.append((doc, len(q_toks & d_toks) / len(union) if union else 0.0))
+            ranked.sort(key=lambda x: -x[1])
+            return ranked[:top_k]
+
+        import numpy as np
+
+        key = id(corpus)
+        if self._cache_key != key:
+            self._cache_emb = self._encode(corpus)
+            self._cache_key = key
+        q_emb = self._encode([query])[0]
+        sims = self._cache_emb @ q_emb  # cosine sim (vectors are normalized)
+        order = np.argsort(-sims)[:top_k]
+        # Clamp to [0, 1] so the score>0 relevance gate matches BM25 semantics.
+        return [(corpus[i], float(max(0.0, sims[i]))) for i in order]

@@ -36,6 +36,53 @@ Query
 2. Aggregate with `attribute_failures` to get per-stage counts and propagation rates.
 3. Evaluate with `end_to_end_accuracy`, `severity_weighted_failure_rate`, and `stage_attribution_rate`.
 
+## Real LLM Agent + Interventional Diagnosis
+
+Beyond the heuristic control pipeline, the package ships a real, provider-agnostic
+agent and an *interventional* failure-propagation framework.
+
+- **`LLMAgent` ([agents.py](src/agenticrag/agents.py))** — ReAct-style iterative
+  retrieval (decompose → retrieve → reason → re-retrieve → answer) behind the same
+  `retriever` seam as the heuristic pipeline. Backbones via thin adapters:
+  `ClaudeProvider` (Opus 4.8 / Sonnet 4.6, primary), `OpenAIProvider`, and a
+  deterministic `MockProvider` that needs no API key (offline smoke + the
+  heuristic control). The agent is **resumable** (`resume_from_hops`,
+  `force_answer`), which is what makes injection interventional.
+- **`LiveFailureInjector` ([injection.py](src/agenticrag/injection.py))** —
+  `do(failure = f at hop h)`: corrupt the trajectory prefix at a hop, then let the
+  agent re-run the suffix, so downstream propagation is the agent's *real reaction*
+  (it may self-correct). Interventions: empty / irrelevant retrieval, query drift,
+  CRAG-style false-premise and stale-evidence, and early termination. Ground-truth
+  labels (`injected_stage`, `injected_failure_type`, `injected_at_hop`) are
+  preserved for certified-root-cause evaluation.
+- **Diagnosers ([diagnosers.py](src/agenticrag/diagnosers.py))** — three post-hoc
+  baselines (`RuleBasedDiagnoser`, `DoctorRAGDiagnoser`, `LLMJudgeDiagnoser`) and
+  the **`PropagationAwareDiagnoser`** (C3): counterfactual single-hop repair probes
+  that localize the earliest causally-responsible hop, recovering root causes that
+  surface-level diagnosis misses — at a re-execution token cost.
+- **Metrics ([evaluate.py](src/agenticrag/evaluate.py),
+  [propagation.py](src/agenticrag/propagation.py))** — `attribution_identifiability`
+  (RCA vs propagation depth, the C2 curve), `cost_per_correct_diagnosis`
+  (deployability), and `counterfactual_recovery_rate` (Pearl rung 3).
+- **Datasets ([datasets.py](src/agenticrag/datasets.py))** — anchor sets
+  (HotpotQA, MuSiQue) plus the richness sets **FRAMES** (variable 2–15-hop depth
+  substrate) and **CRAG** (multi-domain; false-premise / long-tail / temporal).
+
+### Headline experiment
+
+```bash
+# Offline smoke (mock backbone, no API key, FRAMES fallback):
+python scripts/run_identifiability.py --dataset frames --provider mock --hops 1 2 3
+
+# Real backbone (set ANTHROPIC_API_KEY), variable-depth substrate:
+python scripts/run_identifiability.py --dataset frames --provider claude \
+    --model claude-opus-4-8 --retriever dense --max-samples 100 --hops 1 2 3
+```
+
+Produces the root-cause-attribution-accuracy-vs-injection-depth table per diagnoser
+plus cost-per-correct-diagnosis and counterfactual recovery, saved to
+`results/identifiability_{provider}_{dataset}.json`.
+
 ## Benchmark Stats Template
 
 | Metric                      | Value  |

@@ -26,6 +26,12 @@ htmlcov/
 results/
 figures/
 
+# Cached dataset artifacts (e.g. FRAMES Wikipedia page text)
+.agenticrag_cache/
+
+# Secrets — keep .env.example committed, never the filled-in .env
+.env
+
 # Editor / OS
 .DS_Store
 .idea/

@@ -1,8 +1,38 @@
 from __future__ import annotations
 
-from typing import Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from .core import FailureRecord, FailureStage, PipelineTrace
+from .core import FailureRecord, FailureStage, PipelineTrace, _normalize_answer, _token_recall
+
+
+def answer_token_recall(prediction: str, reference: str) -> float:
+    """Token recall of *prediction* against *reference* after SQuAD-style normalization."""
+    return _token_recall(prediction, reference)
+
+
+def answer_em_score(prediction: str, reference: str) -> float:
+    """Exact-match score (1.0 or 0.0) after SQuAD-style normalization."""
+    return 1.0 if _normalize_answer(prediction) == _normalize_answer(reference) else 0.0
+
+
+def mean_answer_recall(
+    traces: List[PipelineTrace],
+) -> float:
+    """Mean token recall of final_answer vs reference_answer across traces."""
+    if not traces:
+        return 0.0
+    return sum(
+        _token_recall(t.final_answer, t.reference_answer) for t in traces
+    ) / len(traces)
+
+
+def mean_answer_em(traces: List[PipelineTrace]) -> float:
+    """Mean exact-match score of final_answer vs reference_answer across traces."""
+    if not traces:
+        return 0.0
+    return sum(
+        answer_em_score(t.final_answer, t.reference_answer) for t in traces
+    ) / len(traces)
 
 
 def stage_attribution_rate(records: List[FailureRecord], stage: FailureStage) -> float:
@@ -190,6 +220,213 @@ def failure_amplification_rate(
             failed = sum(1 for r in records if r.stage != FailureStage.NONE)
             result[hop] = failed / len(records)
     return result
+
+
+# --------------------------------------------------------------------------- #
+# Attribution-identifiability + cost metrics (W4 / C2 / C3)                      #
+# --------------------------------------------------------------------------- #
+
+def _coerce_truth(item: Any) -> Tuple[FailureStage, int]:
+    """Normalize a ground-truth root cause to ``(stage, hop)``.
+
+    Accepts an ``InjectionResult`` (``injected_stage`` / ``injected_at_hop``), a
+    ``FailureRecord`` (``stage`` / no hop -> 0), a ``(stage, hop)`` tuple, or a
+    bare ``FailureStage`` / stage string (hop -> 0).
+    """
+    if hasattr(item, "injected_stage") and hasattr(item, "injected_at_hop"):
+        return _as_stage(item.injected_stage), int(item.injected_at_hop)
+    if isinstance(item, FailureRecord):
+        return item.stage, 0
+    if isinstance(item, tuple) and len(item) == 2:
+        return _as_stage(item[0]), int(item[1])
+    return _as_stage(item), 0
+
+
+def _as_stage(value: Any) -> FailureStage:
+    if isinstance(value, FailureStage):
+        return value
+    return FailureStage(str(value))
+
+
+def _diagnosis_pair(diag: Any) -> Tuple[FailureStage, int]:
+    """Extract ``(stage, predicted_hop)`` from a Diagnosis-like or FailureRecord."""
+    if hasattr(diag, "predicted_hop"):
+        return _as_stage(diag.stage), int(diag.predicted_hop)
+    if isinstance(diag, FailureRecord):
+        return diag.stage, 0
+    raise TypeError(f"Cannot read a diagnosis from {type(diag)!r}")
+
+
+def diagnosis_correct(
+    diag: Any,
+    truth: Any,
+    criterion: str = "hop",
+    hop_tolerance: int = 0,
+) -> bool:
+    """Whether *diag* matches ground-truth *truth* under *criterion*.
+
+    criterion:
+        ``"stage"`` — predicted stage equals injected stage.
+        ``"hop"``   — predicted hop within ``hop_tolerance`` of injected hop.
+        ``"both"``  — stage and hop both match.
+    """
+    pred_stage, pred_hop = _diagnosis_pair(diag)
+    true_stage, true_hop = _coerce_truth(truth)
+    stage_ok = pred_stage == true_stage
+    hop_ok = abs(pred_hop - true_hop) <= hop_tolerance
+    if criterion == "stage":
+        return stage_ok
+    if criterion == "hop":
+        return hop_ok
+    if criterion == "both":
+        return stage_ok and hop_ok
+    raise ValueError("criterion must be 'stage', 'hop', or 'both'")
+
+
+def localization_accuracy(
+    diagnoses: Sequence[Any],
+    truths: Sequence[Any],
+    criterion: str = "hop",
+    hop_tolerance: int = 0,
+) -> float:
+    """Fraction of diagnoses that correctly localize the root cause."""
+    if len(diagnoses) != len(truths):
+        raise ValueError("diagnoses and truths must have the same length")
+    if not diagnoses:
+        return 0.0
+    correct = sum(
+        1
+        for d, t in zip(diagnoses, truths)
+        if diagnosis_correct(d, t, criterion=criterion, hop_tolerance=hop_tolerance)
+    )
+    return correct / len(diagnoses)
+
+
+def mean_localization_error(diagnoses: Sequence[Any], truths: Sequence[Any]) -> float:
+    """Mean absolute hop distance between predicted and injected hop."""
+    if len(diagnoses) != len(truths):
+        raise ValueError("diagnoses and truths must have the same length")
+    if not diagnoses:
+        return 0.0
+    errs = [
+        abs(_diagnosis_pair(d)[1] - _coerce_truth(t)[1])
+        for d, t in zip(diagnoses, truths)
+    ]
+    return sum(errs) / len(errs)
+
+
+def attribution_identifiability(
+    diagnoses_by_depth: Dict[int, Sequence[Any]],
+    truths_by_depth: Dict[int, Sequence[Any]],
+    criterion: str = "hop",
+    hop_tolerance: int = 0,
+) -> Dict[int, float]:
+    """Root-cause-attribution accuracy as a function of injection depth (the C2 curve).
+
+    Returns ``{depth: accuracy}``.  The headline finding is that for post-hoc
+    diagnosers this decays toward 0 as depth grows (the failure becomes
+    unidentifiable from the final trace once it propagates and is masked), while
+    the propagation-aware diagnoser stays high.
+
+    Parameters
+    ----------
+    diagnoses_by_depth:
+        ``{injection_depth: [Diagnosis, ...]}``.
+    truths_by_depth:
+        ``{injection_depth: [InjectionResult | (stage, hop) | ...]}`` aligned with
+        ``diagnoses_by_depth``.
+    criterion / hop_tolerance:
+        Forwarded to :func:`diagnosis_correct`.
+    """
+    out: Dict[int, float] = {}
+    for depth in sorted(diagnoses_by_depth):
+        diags = diagnoses_by_depth[depth]
+        truths = truths_by_depth.get(depth, [])
+        if len(diags) != len(truths):
+            raise ValueError(
+                f"depth {depth}: diagnoses ({len(diags)}) and truths ({len(truths)}) differ"
+            )
+        out[depth] = localization_accuracy(
+            diags, truths, criterion=criterion, hop_tolerance=hop_tolerance
+        )
+    return out
+
+
+def rescore_identifiability(
+    result: Dict[str, Any],
+    criterion: str = "stage",
+    hop_tolerance: int = 0,
+) -> Dict[str, Dict[int, float]]:
+    """Recompute per-diagnoser accuracy vs depth from persisted raw diagnoses.
+
+    Lets you evaluate an already-run experiment under a *different* criterion
+    (``stage`` / ``hop`` / ``both``) or hop tolerance without re-spending tokens —
+    it reads ``result["raw_by_depth"]`` (written by ``run_identifiability`` when a
+    ``checkpoint_path`` / final JSON is produced).
+
+    Returns ``{diagnoser: {depth: accuracy}}``.
+    """
+    raw = result.get("raw_by_depth", {})
+    names = result.get("diagnosers", [])
+    out: Dict[str, Dict[int, float]] = {n: {} for n in names}
+    for depth_str, entry in raw.items():
+        depth = int(depth_str)
+        truth = entry.get("truth", [])
+        preds_by_name = entry.get("predictions", {})
+        for name in names:
+            preds = preds_by_name.get(name, [])
+            n = min(len(preds), len(truth))
+            if n == 0:
+                out[name][depth] = 0.0
+                continue
+            correct = 0
+            for pred, tru in zip(preds[:n], truth[:n]):
+                pred_stage, pred_hop = _as_stage(pred[0]), int(pred[1])
+                true_stage, true_hop = _as_stage(tru[0]), int(tru[1])
+                stage_ok = pred_stage == true_stage
+                hop_ok = abs(pred_hop - true_hop) <= hop_tolerance
+                if criterion == "stage":
+                    ok = stage_ok
+                elif criterion == "hop":
+                    ok = hop_ok
+                elif criterion == "both":
+                    ok = stage_ok and hop_ok
+                else:
+                    raise ValueError("criterion must be 'stage', 'hop', or 'both'")
+                correct += int(ok)
+            out[name][depth] = correct / n
+    return out
+
+
+def cost_per_correct_diagnosis(
+    diagnoses: Sequence[Any],
+    truths: Sequence[Any],
+    criterion: str = "hop",
+    hop_tolerance: int = 0,
+) -> Dict[str, float]:
+    """Deployability metric: token cost spent per correctly-localized diagnosis.
+
+    Returns ``{"total_cost", "n_correct", "n", "accuracy", "cost_per_correct"}``.
+    ``cost_per_correct`` is ``inf`` when no diagnosis is correct (all cost, no
+    yield) — the right behaviour for a diagnoser that spends tokens but never
+    localizes. Lets the paper trade a method's accuracy against its token budget.
+    """
+    if len(diagnoses) != len(truths):
+        raise ValueError("diagnoses and truths must have the same length")
+    total_cost = float(sum(getattr(d, "cost_tokens", 0) for d in diagnoses))
+    n = len(diagnoses)
+    n_correct = sum(
+        1
+        for d, t in zip(diagnoses, truths)
+        if diagnosis_correct(d, t, criterion=criterion, hop_tolerance=hop_tolerance)
+    )
+    return {
+        "total_cost": total_cost,
+        "n_correct": float(n_correct),
+        "n": float(n),
+        "accuracy": (n_correct / n) if n else 0.0,
+        "cost_per_correct": (total_cost / n_correct) if n_correct else float("inf"),
+    }
 
 
 def recovery_rate(records_by_hop: Dict[int, List[FailureRecord]]) -> float:

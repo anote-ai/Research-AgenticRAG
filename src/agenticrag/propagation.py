@@ -29,7 +29,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
-from .core import FailureRecord, FailureStage
+from .core import FailureRecord, FailureStage, _answer_correct
 
 
 @dataclass(frozen=True)
@@ -319,3 +319,40 @@ class PropagationGraph:
             "self_correction_rate": self.self_correction_rate(),
             "n_edges": len(self.edges()),
         }
+
+
+# --------------------------------------------------------------------------- #
+# Counterfactual recovery (Pearl rung 3) — extends recovery_rate / self_correction
+# --------------------------------------------------------------------------- #
+
+def counterfactual_recovery_rate(
+    injection_results: Sequence[Any],
+    references: Sequence[Dict[str, Any]],
+) -> float:
+    """Fraction of live interventions the agent *absorbed* (Pearl rung 3).
+
+    Given live ``InjectionResult`` objects — where the agent re-ran the suffix
+    after a ``do(failure)`` intervention — this is the fraction whose injected
+    trace *still* produced a correct answer. It quantifies how often the agent
+    counterfactually recovers from an injected fault, complementing the
+    observational ``self_correction_rate`` / ``recovery_rate`` with an
+    interventional measurement.
+
+    Parameters
+    ----------
+    injection_results:
+        Objects exposing ``injected_trace`` (a ``PipelineTrace``), or bare
+        ``PipelineTrace`` objects.
+    references:
+        Aligned reference dicts, each with an ``"answer"`` key.
+    """
+    if len(injection_results) != len(references):
+        raise ValueError("injection_results and references must have the same length")
+    if not injection_results:
+        return 0.0
+    recovered = 0
+    for res, ref in zip(injection_results, references):
+        trace = getattr(res, "injected_trace", res)
+        if _answer_correct(trace.final_answer, ref.get("answer", "")):
+            recovered += 1
+    return recovered / len(injection_results)

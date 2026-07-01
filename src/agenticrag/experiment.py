@@ -21,17 +21,28 @@ Typical usage::
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence
 
-from .core import DiagnosticBenchmark, FailureRecord, FailureStage, PipelineTrace
+from .core import (
+    DiagnosticBenchmark,
+    FailureRecord,
+    FailureStage,
+    PipelineTrace,
+    _answer_correct,
+)
 from .evaluate import (
+    cost_per_correct_diagnosis,
     end_to_end_accuracy,
+    localization_accuracy,
     root_cause_accuracy,
     severity_weighted_failure_rate,
     stage_attribution_rate,
 )
-from .injection import FailureInjector, InjectionResult
+from .injection import FailureInjector, InjectionResult, LiveFailureInjector
+from .propagation import counterfactual_recovery_rate
 
 
 # ---------------------------------------------------------------------------
@@ -346,3 +357,243 @@ def _run_cell(
         severity_rate=severity,
         stage_rates=stage_rates,
     )
+
+
+# ---------------------------------------------------------------------------
+# Identifiability experiment (C2 headline + C3 method comparison)
+# ---------------------------------------------------------------------------
+
+# Live interventions used for the depth curve by default. Each corrupts retrieval
+# at the chosen hop; the agent then reacts for real (it may self-correct).
+_DEFAULT_LIVE_METHODS: List[str] = [
+    "inject_irrelevant_docs",
+    "inject_empty_retrieval",
+    "inject_false_premise",
+    "inject_stale_evidence",
+]
+
+
+@dataclass
+class IdentifiabilityResult:
+    """Per-diagnoser root-cause-attribution accuracy vs injection depth.
+
+    ``accuracy[diagnoser][depth]`` is the localization accuracy over the *failed*
+    injected traces at that depth (you can only attribute a failure that
+    occurred). ``recovery_rate_by_depth`` reports the complementary counterfactual
+    recovery (faults the agent absorbed). ``cost[diagnoser][depth]`` carries the
+    cost-per-correct-diagnosis breakdown for the deployability angle.
+    """
+
+    hops: List[int]
+    diagnoser_names: List[str]
+    accuracy: Dict[str, Dict[int, float]]
+    cost: Dict[str, Dict[int, Dict[str, float]]]
+    recovery_rate_by_depth: Dict[int, float]
+    n_total_by_depth: Dict[int, int]
+    n_failed_by_depth: Dict[int, int]
+    # Per-depth raw diagnoses + ground truth, so accuracy can be re-scored under
+    # a different criterion (stage / hop_tolerance) without re-spending tokens.
+    # raw_by_depth[depth] = {"truth": [[stage, hop], ...],
+    #                        "predictions": {name: [[stage, hop, cost], ...]}}
+    raw_by_depth: Dict[int, Dict[str, Any]] = field(default_factory=dict)
+
+    def accuracy_table(self) -> Dict[str, Dict[str, float]]:
+        """``{diagnoser: {"hop{d}": acc}}`` — ready for a paper table."""
+        return {
+            name: {f"hop{d}": self.accuracy[name].get(d, 0.0) for d in self.hops}
+            for name in self.diagnoser_names
+        }
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "hops": self.hops,
+            "diagnosers": self.diagnoser_names,
+            "accuracy": {n: {str(k): v for k, v in self.accuracy[n].items()} for n in self.diagnoser_names},
+            "cost": {n: {str(k): v for k, v in self.cost[n].items()} for n in self.diagnoser_names},
+            "recovery_rate_by_depth": {str(k): v for k, v in self.recovery_rate_by_depth.items()},
+            "n_total_by_depth": {str(k): v for k, v in self.n_total_by_depth.items()},
+            "n_failed_by_depth": {str(k): v for k, v in self.n_failed_by_depth.items()},
+            "raw_by_depth": {str(k): v for k, v in self.raw_by_depth.items()},
+        }
+
+
+def run_identifiability(
+    agent: Any,
+    samples: Sequence[Any],
+    diagnosers: Dict[str, Any],
+    hops: Sequence[int] = (1, 2, 3),
+    injection_methods: Optional[List[str]] = None,
+    injector: Optional[LiveFailureInjector] = None,
+    criterion: str = "hop",
+    hop_tolerance: int = 0,
+    min_corpus: int = 1,
+    checkpoint_path: Optional[str] = None,
+    checkpoint_extra: Optional[Dict[str, Any]] = None,
+    resume: bool = False,
+) -> IdentifiabilityResult:
+    """Run the attribution-identifiability experiment (C2 curve + C3 comparison).
+
+    For each injection ``depth`` and each :class:`QASample`, the agent produces a
+    base trajectory; each live injection method corrupts retrieval at ``depth``
+    and the agent re-runs the suffix (live re-execution). Every diagnoser then
+    attempts to localize the certified root cause. The headline output is
+    ``accuracy[diagnoser][depth]`` — post-hoc baselines decay with depth; the
+    propagation-aware diagnoser should hold up.
+
+    Parameters
+    ----------
+    agent:
+        A resumable :class:`~agenticrag.agents.LLMAgent`.
+    samples:
+        :class:`QASample` objects (``question``, ``answer``, ``supporting_docs``).
+    diagnosers:
+        ``{name: diagnoser}``. The propagation-aware diagnoser reads the corpus
+        from ``reference["corpus"]``, which this driver supplies.
+    hops:
+        Injection depths to sweep.
+    injection_methods:
+        Live ``LiveFailureInjector`` method names. Defaults to the retrieval
+        corruption family.
+    criterion / hop_tolerance:
+        Forwarded to the localization metric ('hop', 'stage', or 'both').
+    min_corpus:
+        Skip samples whose corpus is smaller than this (need docs to retrieve).
+    checkpoint_path:
+        If set, the partial result is written here as JSON after *each depth*
+        completes, so an API error (e.g. credit exhaustion) mid-sweep never
+        discards already-computed depths.
+    checkpoint_extra:
+        Extra keys merged into the checkpoint JSON (e.g. provider / dataset tags).
+    """
+    injector = injector or LiveFailureInjector(agent)
+    methods = injection_methods or list(_DEFAULT_LIVE_METHODS)
+    names = list(diagnosers.keys())
+
+    accuracy: Dict[str, Dict[int, float]] = {n: {} for n in names}
+    cost: Dict[str, Dict[int, Dict[str, float]]] = {n: {} for n in names}
+    recovery: Dict[int, float] = {}
+    n_total: Dict[int, int] = {}
+    n_failed: Dict[int, int] = {}
+    raw: Dict[int, Dict[str, Any]] = {}
+
+    # Per-depth resume: preload depths already computed in a matching checkpoint,
+    # so an interrupted / retried run skips them instead of re-spending tokens.
+    done_depths = _preload_checkpoint(
+        checkpoint_path if resume else None, checkpoint_extra, names,
+        accuracy, cost, recovery, n_total, n_failed, raw,
+    )
+
+    def _snapshot() -> IdentifiabilityResult:
+        return IdentifiabilityResult(
+            hops=list(hops),
+            diagnoser_names=names,
+            accuracy=accuracy,
+            cost=cost,
+            recovery_rate_by_depth=recovery,
+            n_total_by_depth=n_total,
+            n_failed_by_depth=n_failed,
+            raw_by_depth=raw,
+        )
+
+    for depth in hops:
+        if depth in done_depths:
+            continue  # already computed in a matching checkpoint (resume)
+        injected: List[InjectionResult] = []
+        refs: List[Dict[str, Any]] = []
+        for s in samples:
+            corpus = list(s.supporting_docs)
+            if len(corpus) < min_corpus:
+                continue
+            base = agent.run(s.question, corpus, reference_answer=s.answer)
+            for method in methods:
+                res = getattr(injector, method)(base, corpus, hop=depth)
+                injected.append(res)
+                refs.append({"answer": s.answer, "corpus": corpus})
+
+        n_total[depth] = len(injected)
+        recovery[depth] = counterfactual_recovery_rate(injected, refs) if injected else 0.0
+
+        # Restrict RCA to traces where the injected fault actually caused a wrong
+        # answer — a recovered trace has no failure to attribute.
+        failed = [
+            (r, ref)
+            for r, ref in zip(injected, refs)
+            if not _answer_correct(r.injected_trace.final_answer, ref["answer"])
+        ]
+        n_failed[depth] = len(failed)
+        f_results = [r for r, _ in failed]
+        f_refs = [ref for _, ref in failed]
+
+        truth = [[r.injected_stage.value, r.injected_at_hop] for r in f_results]
+        predictions: Dict[str, List[List[Any]]] = {}
+        for name, diag in diagnosers.items():
+            diags = [diag.diagnose(r.injected_trace, ref) for r, ref in zip(f_results, f_refs)]
+            accuracy[name][depth] = localization_accuracy(
+                diags, f_results, criterion=criterion, hop_tolerance=hop_tolerance
+            )
+            cost[name][depth] = cost_per_correct_diagnosis(
+                diags, f_results, criterion=criterion, hop_tolerance=hop_tolerance
+            )
+            predictions[name] = [[d.stage.value, d.predicted_hop, d.cost_tokens] for d in diags]
+        raw[depth] = {"truth": truth, "predictions": predictions}
+
+        if checkpoint_path:
+            _write_checkpoint(checkpoint_path, _snapshot(), checkpoint_extra)
+
+    return _snapshot()
+
+
+def _preload_checkpoint(
+    path: Optional[str],
+    extra: Optional[Dict[str, Any]],
+    names: List[str],
+    accuracy: Dict[str, Dict[int, float]],
+    cost: Dict[str, Dict[int, Dict[str, float]]],
+    recovery: Dict[int, float],
+    n_total: Dict[int, int],
+    n_failed: Dict[int, int],
+    raw: Dict[int, Dict[str, Any]],
+) -> set:
+    """Load already-computed depths from a *matching* checkpoint; return their set.
+
+    Only reuses depths when the checkpoint's run config (``max_samples`` /
+    ``propagation_budget`` / ``retriever`` — whatever keys are in ``extra``)
+    matches the current run, so a config change safely recomputes from scratch.
+    """
+    if not path or not os.path.exists(path):
+        return set()
+    try:
+        with open(path) as f:
+            prior = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return set()
+
+    for key in ("max_samples", "propagation_budget", "retriever"):
+        if extra is not None and key in extra and prior.get(key) != extra.get(key):
+            return set()  # config differs — do not reuse
+
+    def _iload(d: Dict[str, Any]) -> Dict[int, Any]:
+        return {int(k): v for k, v in d.items()}
+
+    for name in names:
+        accuracy[name].update(_iload(prior.get("accuracy", {}).get(name, {})))
+        cost[name].update(_iload(prior.get("cost", {}).get(name, {})))
+    recovery.update(_iload(prior.get("recovery_rate_by_depth", {})))
+    n_total.update(_iload(prior.get("n_total_by_depth", {})))
+    n_failed.update(_iload(prior.get("n_failed_by_depth", {})))
+    raw.update(_iload(prior.get("raw_by_depth", {})))
+    return set(raw.keys())
+
+
+def _write_checkpoint(
+    path: str, result: IdentifiabilityResult, extra: Optional[Dict[str, Any]]
+) -> None:
+    payload = dict(extra or {})
+    payload.update(result.to_dict())
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(payload, f, indent=2)
+    os.replace(tmp, path)  # atomic; a crash never leaves a truncated file

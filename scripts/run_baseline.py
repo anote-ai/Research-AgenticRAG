@@ -20,7 +20,12 @@ import os
 import sys
 from typing import Any, Dict, List, Tuple
 
+sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from _env import load_dotenv
+
+load_dotenv()  # populate os.environ from .env (e.g. HF_TOKEN) before loaders run
 
 from agenticrag import (
     AgenticRAGPipeline,

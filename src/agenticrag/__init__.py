@@ -23,20 +23,67 @@ from .evaluate import (
     hop_doc_coverage,
     failure_amplification_rate,
     recovery_rate,
+    answer_token_recall,
+    answer_em_score,
+    mean_answer_recall,
+    mean_answer_em,
+    diagnosis_correct,
+    localization_accuracy,
+    mean_localization_error,
+    attribution_identifiability,
+    cost_per_correct_diagnosis,
+    rescore_identifiability,
 )
 from .data import make_trace, make_dataset, make_multi_hop_trace, build_knowledge_graph, make_multi_hop_corpus
-from .retrievers import BM25Retriever, TokenOverlapRetriever
-from .datasets import QASample, load_hotpotqa, load_musique, load_dataset, iter_batches
-from .injection import FailureInjector, InjectionResult, injection_sensitivity
+from .retrievers import BM25Retriever, TokenOverlapRetriever, DenseRetriever
+from .datasets import (
+    QASample,
+    load_hotpotqa,
+    load_musique,
+    load_frames,
+    load_crag,
+    load_dataset,
+    iter_batches,
+)
+from .agents import (
+    LLMResponse,
+    LLMProvider,
+    ClaudeProvider,
+    OpenAIProvider,
+    MockProvider,
+    make_provider,
+    AgentDecision,
+    parse_decision,
+    HopState,
+    LLMAgent,
+)
+from .injection import (
+    FailureInjector,
+    InjectionResult,
+    injection_sensitivity,
+    LiveFailureInjector,
+    LIVE_INJECTIONS,
+)
+from .diagnosers import (
+    Diagnosis,
+    Diagnoser,
+    RuleBasedDiagnoser,
+    DoctorRAGDiagnoser,
+    LLMJudgeDiagnoser,
+    PropagationAwareDiagnoser,
+    batch_diagnose,
+)
 from .experiment import (
     AblationCell,
     AblationResult,
     run_ablation,
+    IdentifiabilityResult,
+    run_identifiability,
     HOP_METHODS,
     ANSWER_METHODS,
     ALL_METHODS,
 )
-from .propagation import PropagationEdge, PropagationGraph
+from .propagation import PropagationEdge, PropagationGraph, counterfactual_recovery_rate
 
 __all__ = [
     # Core models
@@ -63,6 +110,16 @@ __all__ = [
     "hop_doc_coverage",
     "failure_amplification_rate",
     "recovery_rate",
+    "answer_token_recall",
+    "answer_em_score",
+    "mean_answer_recall",
+    "mean_answer_em",
+    "diagnosis_correct",
+    "localization_accuracy",
+    "mean_localization_error",
+    "attribution_identifiability",
+    "cost_per_correct_diagnosis",
+    "rescore_identifiability",
     # Synthetic data
     "make_trace",
     "make_dataset",
@@ -72,24 +129,51 @@ __all__ = [
     # Retrievers
     "BM25Retriever",
     "TokenOverlapRetriever",
+    "DenseRetriever",
     # Dataset adapters
     "QASample",
     "load_hotpotqa",
     "load_musique",
+    "load_frames",
+    "load_crag",
     "load_dataset",
     "iter_batches",
+    # Real LLM agent
+    "LLMResponse",
+    "LLMProvider",
+    "ClaudeProvider",
+    "OpenAIProvider",
+    "MockProvider",
+    "make_provider",
+    "AgentDecision",
+    "parse_decision",
+    "HopState",
+    "LLMAgent",
     # Failure injection
     "FailureInjector",
     "InjectionResult",
     "injection_sensitivity",
+    "LiveFailureInjector",
+    "LIVE_INJECTIONS",
+    # Diagnosers
+    "Diagnosis",
+    "Diagnoser",
+    "RuleBasedDiagnoser",
+    "DoctorRAGDiagnoser",
+    "LLMJudgeDiagnoser",
+    "PropagationAwareDiagnoser",
+    "batch_diagnose",
     # Ablation experiment runner
     "AblationCell",
     "AblationResult",
     "run_ablation",
+    "IdentifiabilityResult",
+    "run_identifiability",
     "HOP_METHODS",
     "ANSWER_METHODS",
     "ALL_METHODS",
     # Propagation graph
     "PropagationEdge",
     "PropagationGraph",
+    "counterfactual_recovery_rate",
 ]

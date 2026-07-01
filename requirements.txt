@@ -6,3 +6,6 @@ tqdm
 rank-bm25
 datasets
 sentence-transformers
+# Real-LLM agent backbones (lazily imported; only needed for non-mock providers)
+anthropic
+openai
