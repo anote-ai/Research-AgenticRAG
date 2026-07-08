@@ -37,6 +37,14 @@ from .evaluate import (
     ancestor_hit_rate,
     bootstrap_localization_ci,
     slice_identifiability,
+    corruption_absorption_rates,
+)
+from .corruption import (
+    CorruptionRecord,
+    select_target_span,
+    make_replacement,
+    corrupt_docs,
+    classify_absorption,
 )
 from .data import make_trace, make_dataset, make_multi_hop_trace, build_knowledge_graph, make_multi_hop_corpus
 from .retrievers import BM25Retriever, TokenOverlapRetriever, DenseRetriever
@@ -130,6 +138,13 @@ __all__ = [
     "ancestor_hit_rate",
     "bootstrap_localization_ci",
     "slice_identifiability",
+    "corruption_absorption_rates",
+    # Content corruption (certified spans + deterministic generation eval)
+    "CorruptionRecord",
+    "select_target_span",
+    "make_replacement",
+    "corrupt_docs",
+    "classify_absorption",
     # Synthetic data
     "make_trace",
     "make_dataset",

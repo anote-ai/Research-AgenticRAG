@@ -34,6 +34,7 @@ class FailureType(str, Enum):
     EARLY_TERMINATION = "early_termination"  # answered before gathering evidence (~ premature collapse)
     FALSE_PREMISE = "false_premise"       # misleading premise injected into evidence (CRAG-style)
     STALE_EVIDENCE = "stale_evidence"     # outdated/temporally-wrong evidence injected
+    CORRUPTED_EVIDENCE = "corrupted_evidence"  # answer/bridge fact flipped inside topically-intact docs
     # No failure
     SUCCESS = "success"
 

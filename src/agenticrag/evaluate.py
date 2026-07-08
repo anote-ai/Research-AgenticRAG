@@ -563,6 +563,39 @@ def cost_per_correct_diagnosis(
     }
 
 
+def corruption_absorption_rates(result: Dict[str, Any]) -> Dict[int, Dict[str, float]]:
+    """Per-depth absorbed / resisted / derailed rates from a persisted result JSON.
+
+    Reads the ``raw_by_depth`` block of an identifiability result and tallies
+    the deterministic ``absorption`` labels recorded for content-corruption
+    cases (failed cases live in ``metadata``, injected-but-recovered ones in
+    ``recovered_metadata``).  Zero LLM cost — pure rescoring of saved output.
+
+    Returns ``{depth: {"absorbed": r, "resisted": r, "derailed": r, "n": n}}``;
+    depths with no corruption cases are omitted.
+    """
+    out: Dict[int, Dict[str, float]] = {}
+    for depth_str, entry in result.get("raw_by_depth", {}).items():
+        metas = [
+            m
+            for m in list(entry.get("metadata", [])) + list(entry.get("recovered_metadata", []))
+            if "absorption" in m
+        ]
+        if not metas:
+            continue
+        n = len(metas)
+        counts: Dict[str, int] = {}
+        for m in metas:
+            counts[m["absorption"]] = counts.get(m["absorption"], 0) + 1
+        out[int(depth_str)] = {
+            "absorbed": counts.get("absorbed", 0) / n,
+            "resisted": counts.get("resisted", 0) / n,
+            "derailed": counts.get("derailed", 0) / n,
+            "n": float(n),
+        }
+    return out
+
+
 def recovery_rate(records_by_hop: Dict[int, List[FailureRecord]]) -> float:
     """Fraction of mid-pipeline failures that eventually resolved (stage == NONE).
 

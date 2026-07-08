@@ -1,0 +1,582 @@
+[
+  {
+    "file": "results/identifiability_claude_claude-haiku-4-5_crag.json",
+    "provider": "claude:claude-haiku-4-5",
+    "dataset": "crag",
+    "retriever": "bm25",
+    "strict_depth_flag": "MISSING",
+    "depth_audit": {
+      "1": {
+        "total_failed": 4,
+        "kept_actual_depth": 4,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.25,
+        "rule_based_strict": 0.25,
+        "doctor_rag_loose": 0.5,
+        "doctor_rag_strict": 0.5,
+        "llm_judge_loose": 0.25,
+        "llm_judge_strict": 0.25,
+        "propagation_aware_loose": 0.25,
+        "propagation_aware_strict": 0.25
+      },
+      "2": {
+        "total_failed": 4,
+        "kept_actual_depth": 0,
+        "filtered_clamped": 4,
+        "pct_contaminated": 100.0,
+        "rule_based_loose": 0.25,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.5,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.0,
+        "llm_judge_strict": 0.0,
+        "propagation_aware_loose": 0.25,
+        "propagation_aware_strict": 0.0
+      },
+      "3": {
+        "total_failed": 4,
+        "kept_actual_depth": 0,
+        "filtered_clamped": 4,
+        "pct_contaminated": 100.0,
+        "rule_based_loose": 0.25,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.5,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.25,
+        "llm_judge_strict": 0.0,
+        "propagation_aware_loose": 0.25,
+        "propagation_aware_strict": 0.0
+      }
+    }
+  },
+  {
+    "file": "results/identifiability_claude_claude-haiku-4-5_frames.json",
+    "provider": "claude:claude-haiku-4-5",
+    "dataset": "frames",
+    "retriever": "bm25",
+    "strict_depth_flag": "MISSING",
+    "depth_audit": {
+      "1": {
+        "total_failed": 119,
+        "kept_actual_depth": 119,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 1.0,
+        "doctor_rag_strict": 1.0,
+        "llm_judge_loose": 0.36134453781512604,
+        "llm_judge_strict": 0.36134453781512604,
+        "propagation_aware_loose": 0.8403361344537815,
+        "propagation_aware_strict": 0.8403361344537815
+      },
+      "2": {
+        "total_failed": 116,
+        "kept_actual_depth": 112,
+        "filtered_clamped": 4,
+        "pct_contaminated": 3.4,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.034482758620689655,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.46551724137931033,
+        "llm_judge_strict": 0.48214285714285715,
+        "propagation_aware_loose": 0.1724137931034483,
+        "propagation_aware_strict": 0.16071428571428573
+      },
+      "3": {
+        "total_failed": 123,
+        "kept_actual_depth": 108,
+        "filtered_clamped": 15,
+        "pct_contaminated": 12.2,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.032520325203252036,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.1951219512195122,
+        "llm_judge_strict": 0.18518518518518517,
+        "propagation_aware_loose": 0.056910569105691054,
+        "propagation_aware_strict": 0.009259259259259259
+      }
+    }
+  },
+  {
+    "file": "results/identifiability_claude_claude-haiku-4-5_hotpotqa_bm25_corruption.json",
+    "provider": "claude:claude-haiku-4-5",
+    "dataset": "hotpotqa",
+    "retriever": "bm25",
+    "strict_depth_flag": true,
+    "depth_audit": {
+      "1": {
+        "total_failed": 13,
+        "kept_actual_depth": 13,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 1.0,
+        "doctor_rag_strict": 1.0,
+        "llm_judge_loose": 0.3076923076923077,
+        "llm_judge_strict": 0.3076923076923077,
+        "propagation_aware_loose": 0.8461538461538461,
+        "propagation_aware_strict": 0.8461538461538461,
+        "suffix_regen_loose": 0.9230769230769231,
+        "suffix_regen_strict": 0.9230769230769231
+      },
+      "2": {
+        "total_failed": 4,
+        "kept_actual_depth": 4,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.0,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 1.0,
+        "llm_judge_strict": 1.0,
+        "propagation_aware_loose": 0.75,
+        "propagation_aware_strict": 0.75,
+        "suffix_regen_loose": 0.25,
+        "suffix_regen_strict": 0.25
+      },
+      "3": {
+        "total_failed": 0,
+        "kept_actual_depth": 0,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.0,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.0,
+        "llm_judge_strict": 0.0,
+        "propagation_aware_loose": 0.0,
+        "propagation_aware_strict": 0.0,
+        "suffix_regen_loose": 0.0,
+        "suffix_regen_strict": 0.0
+      }
+    }
+  },
+  {
+    "file": "results/identifiability_claude_claude-haiku-4-5_hotpotqa_dense_b4.json",
+    "provider": "claude:claude-haiku-4-5",
+    "dataset": "hotpotqa",
+    "retriever": "dense",
+    "strict_depth_flag": "MISSING",
+    "depth_audit": {
+      "1": {
+        "total_failed": 39,
+        "kept_actual_depth": 39,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.02564102564102564,
+        "rule_based_strict": 0.02564102564102564,
+        "doctor_rag_loose": 1.0,
+        "doctor_rag_strict": 1.0,
+        "llm_judge_loose": 0.3333333333333333,
+        "llm_judge_strict": 0.3333333333333333,
+        "propagation_aware_loose": 0.5641025641025641,
+        "propagation_aware_strict": 0.5641025641025641
+      }
+    }
+  },
+  {
+    "file": "results/identifiability_claude_claude-haiku-4-5_musique_bm25_corruption.json",
+    "provider": "claude:claude-haiku-4-5",
+    "dataset": "musique",
+    "retriever": "bm25",
+    "strict_depth_flag": true,
+    "depth_audit": {
+      "1": {
+        "total_failed": 11,
+        "kept_actual_depth": 11,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 1.0,
+        "doctor_rag_strict": 1.0,
+        "llm_judge_loose": 0.7272727272727273,
+        "llm_judge_strict": 0.7272727272727273,
+        "propagation_aware_loose": 0.8181818181818182,
+        "propagation_aware_strict": 0.8181818181818182,
+        "suffix_regen_loose": 1.0,
+        "suffix_regen_strict": 1.0
+      },
+      "2": {
+        "total_failed": 4,
+        "kept_actual_depth": 4,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.0,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 1.0,
+        "llm_judge_strict": 1.0,
+        "propagation_aware_loose": 0.75,
+        "propagation_aware_strict": 0.75,
+        "suffix_regen_loose": 0.0,
+        "suffix_regen_strict": 0.0
+      },
+      "3": {
+        "total_failed": 3,
+        "kept_actual_depth": 3,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.0,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.3333333333333333,
+        "llm_judge_strict": 0.3333333333333333,
+        "propagation_aware_loose": 0.0,
+        "propagation_aware_strict": 0.0,
+        "suffix_regen_loose": 0.0,
+        "suffix_regen_strict": 0.0
+      }
+    }
+  },
+  {
+    "file": "results/identifiability_claude_claude-haiku-4-5_musique_dense_b4.json",
+    "provider": "claude:claude-haiku-4-5",
+    "dataset": "musique",
+    "retriever": "dense",
+    "strict_depth_flag": "MISSING",
+    "depth_audit": {
+      "1": {
+        "total_failed": 55,
+        "kept_actual_depth": 55,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 1.0,
+        "doctor_rag_strict": 1.0,
+        "llm_judge_loose": 0.16363636363636364,
+        "llm_judge_strict": 0.16363636363636364,
+        "propagation_aware_loose": 0.7090909090909091,
+        "propagation_aware_strict": 0.7090909090909091
+      },
+      "2": {
+        "total_failed": 51,
+        "kept_actual_depth": 45,
+        "filtered_clamped": 6,
+        "pct_contaminated": 11.8,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.11764705882352941,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.7647058823529411,
+        "llm_judge_strict": 0.8,
+        "propagation_aware_loose": 0.35294117647058826,
+        "propagation_aware_strict": 0.3111111111111111
+      }
+    }
+  },
+  {
+    "file": "results/identifiability_openai_gpt-4o-mini_frames_dense_b4.json",
+    "provider": "openai:gpt-4o-mini",
+    "dataset": "frames",
+    "retriever": "dense",
+    "strict_depth_flag": "MISSING",
+    "depth_audit": {
+      "1": {
+        "total_failed": 193,
+        "kept_actual_depth": 193,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.9792746113989638,
+        "doctor_rag_strict": 0.9792746113989638,
+        "llm_judge_loose": 0.6839378238341969,
+        "llm_judge_strict": 0.6839378238341969,
+        "propagation_aware_loose": 0.8082901554404145,
+        "propagation_aware_strict": 0.8082901554404145
+      },
+      "2": {
+        "total_failed": 196,
+        "kept_actual_depth": 196,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.030612244897959183,
+        "doctor_rag_strict": 0.030612244897959183,
+        "llm_judge_loose": 0.6428571428571429,
+        "llm_judge_strict": 0.6428571428571429,
+        "propagation_aware_loose": 0.20408163265306123,
+        "propagation_aware_strict": 0.20408163265306123
+      }
+    }
+  },
+  {
+    "file": "results/identifiability_openai_gpt-4o-mini_hotpotqa_bm25_corruption.json",
+    "provider": "openai:gpt-4o-mini",
+    "dataset": "hotpotqa",
+    "retriever": "bm25",
+    "strict_depth_flag": true,
+    "depth_audit": {
+      "1": {
+        "total_failed": 13,
+        "kept_actual_depth": 13,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 1.0,
+        "doctor_rag_strict": 1.0,
+        "llm_judge_loose": 0.8461538461538461,
+        "llm_judge_strict": 0.8461538461538461,
+        "propagation_aware_loose": 1.0,
+        "propagation_aware_strict": 1.0,
+        "suffix_regen_loose": 0.9230769230769231,
+        "suffix_regen_strict": 0.9230769230769231
+      },
+      "2": {
+        "total_failed": 4,
+        "kept_actual_depth": 4,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.0,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.75,
+        "llm_judge_strict": 0.75,
+        "propagation_aware_loose": 0.75,
+        "propagation_aware_strict": 0.75,
+        "suffix_regen_loose": 0.0,
+        "suffix_regen_strict": 0.0
+      },
+      "3": {
+        "total_failed": 0,
+        "kept_actual_depth": 0,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.0,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.0,
+        "llm_judge_strict": 0.0,
+        "propagation_aware_loose": 0.0,
+        "propagation_aware_strict": 0.0,
+        "suffix_regen_loose": 0.0,
+        "suffix_regen_strict": 0.0
+      }
+    }
+  },
+  {
+    "file": "results/identifiability_openai_gpt-4o-mini_hotpotqa_dense_b4.json",
+    "provider": "openai:gpt-4o-mini",
+    "dataset": "hotpotqa",
+    "retriever": "dense",
+    "strict_depth_flag": "MISSING",
+    "depth_audit": {
+      "1": {
+        "total_failed": 75,
+        "kept_actual_depth": 75,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 1.0,
+        "doctor_rag_strict": 1.0,
+        "llm_judge_loose": 0.3466666666666667,
+        "llm_judge_strict": 0.3466666666666667,
+        "propagation_aware_loose": 0.6133333333333333,
+        "propagation_aware_strict": 0.6133333333333333
+      },
+      "2": {
+        "total_failed": 74,
+        "kept_actual_depth": 33,
+        "filtered_clamped": 41,
+        "pct_contaminated": 55.4,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.5540540540540541,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.47297297297297297,
+        "llm_judge_strict": 0.5757575757575758,
+        "propagation_aware_loose": 0.527027027027027,
+        "propagation_aware_strict": 0.36363636363636365
+      },
+      "3": {
+        "total_failed": 69,
+        "kept_actual_depth": 20,
+        "filtered_clamped": 49,
+        "pct_contaminated": 71.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.5217391304347826,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.3333333333333333,
+        "llm_judge_strict": 0.5,
+        "propagation_aware_loose": 0.463768115942029,
+        "propagation_aware_strict": 0.3
+      }
+    }
+  },
+  {
+    "file": "results/identifiability_openai_gpt-4o-mini_musique.json",
+    "provider": "openai:gpt-4o-mini",
+    "dataset": "musique",
+    "retriever": "bm25",
+    "strict_depth_flag": "MISSING",
+    "depth_audit": {
+      "1": {
+        "total_failed": 100,
+        "kept_actual_depth": 100,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 1.0,
+        "doctor_rag_strict": 1.0,
+        "llm_judge_loose": 0.57,
+        "llm_judge_strict": 0.57,
+        "propagation_aware_loose": 0.73,
+        "propagation_aware_strict": 0.73
+      },
+      "2": {
+        "total_failed": 106,
+        "kept_actual_depth": 65,
+        "filtered_clamped": 41,
+        "pct_contaminated": 38.7,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.3867924528301887,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.5188679245283019,
+        "llm_judge_strict": 0.5538461538461539,
+        "propagation_aware_loose": 0.3867924528301887,
+        "propagation_aware_strict": 0.2
+      },
+      "3": {
+        "total_failed": 98,
+        "kept_actual_depth": 48,
+        "filtered_clamped": 50,
+        "pct_contaminated": 51.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.336734693877551,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.25510204081632654,
+        "llm_judge_strict": 0.0625,
+        "propagation_aware_loose": 0.40816326530612246,
+        "propagation_aware_strict": 0.16666666666666666
+      }
+    }
+  },
+  {
+    "file": "results/identifiability_openai_gpt-4o-mini_musique_bm25_corruption.json",
+    "provider": "openai:gpt-4o-mini",
+    "dataset": "musique",
+    "retriever": "bm25",
+    "strict_depth_flag": true,
+    "depth_audit": {
+      "1": {
+        "total_failed": 7,
+        "kept_actual_depth": 7,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 1.0,
+        "doctor_rag_strict": 1.0,
+        "llm_judge_loose": 0.42857142857142855,
+        "llm_judge_strict": 0.42857142857142855,
+        "propagation_aware_loose": 0.8571428571428571,
+        "propagation_aware_strict": 0.8571428571428571,
+        "suffix_regen_loose": 0.7142857142857143,
+        "suffix_regen_strict": 0.7142857142857143
+      },
+      "2": {
+        "total_failed": 6,
+        "kept_actual_depth": 6,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.0,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.8333333333333334,
+        "llm_judge_strict": 0.8333333333333334,
+        "propagation_aware_loose": 0.5,
+        "propagation_aware_strict": 0.5,
+        "suffix_regen_loose": 0.16666666666666666,
+        "suffix_regen_strict": 0.16666666666666666
+      },
+      "3": {
+        "total_failed": 0,
+        "kept_actual_depth": 0,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.0,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.0,
+        "llm_judge_strict": 0.0,
+        "propagation_aware_loose": 0.0,
+        "propagation_aware_strict": 0.0,
+        "suffix_regen_loose": 0.0,
+        "suffix_regen_strict": 0.0
+      }
+    }
+  },
+  {
+    "file": "results/identifiability_openai_gpt-4o-mini_musique_dense_b4.json",
+    "provider": "openai:gpt-4o-mini",
+    "dataset": "musique",
+    "retriever": "dense",
+    "strict_depth_flag": "MISSING",
+    "depth_audit": {
+      "1": {
+        "total_failed": 120,
+        "kept_actual_depth": 120,
+        "filtered_clamped": 0,
+        "pct_contaminated": 0.0,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 1.0,
+        "doctor_rag_strict": 1.0,
+        "llm_judge_loose": 0.5,
+        "llm_judge_strict": 0.5,
+        "propagation_aware_loose": 0.6083333333333333,
+        "propagation_aware_strict": 0.6083333333333333
+      },
+      "2": {
+        "total_failed": 114,
+        "kept_actual_depth": 61,
+        "filtered_clamped": 53,
+        "pct_contaminated": 46.5,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.4649122807017544,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.5701754385964912,
+        "llm_judge_strict": 0.6721311475409836,
+        "propagation_aware_loose": 0.5263157894736842,
+        "propagation_aware_strict": 0.3770491803278688
+      },
+      "3": {
+        "total_failed": 105,
+        "kept_actual_depth": 47,
+        "filtered_clamped": 58,
+        "pct_contaminated": 55.2,
+        "rule_based_loose": 0.0,
+        "rule_based_strict": 0.0,
+        "doctor_rag_loose": 0.42857142857142855,
+        "doctor_rag_strict": 0.0,
+        "llm_judge_loose": 0.45714285714285713,
+        "llm_judge_strict": 0.3617021276595745,
+        "propagation_aware_loose": 0.5333333333333333,
+        "propagation_aware_strict": 0.425531914893617
+      }
+    }
+  }
+]

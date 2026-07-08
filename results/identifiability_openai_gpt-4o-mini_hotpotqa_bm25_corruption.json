@@ -1,0 +1,1954 @@
+{
+  "dataset": "hotpotqa",
+  "provider": "openai:gpt-4o-mini",
+  "retriever": "bm25",
+  "criterion": "hop",
+  "max_samples": 40,
+  "propagation_budget": null,
+  "strict_depth": true,
+  "require_base_correct": true,
+  "injection_methods": [
+    "inject_corrupted_evidence"
+  ],
+  "diagnosers_run": [
+    "rule_based",
+    "doctor_rag",
+    "llm_judge",
+    "propagation_aware",
+    "suffix_regen"
+  ],
+  "judge": "claude:claude-haiku-4-5",
+  "hops": [
+    1,
+    2,
+    3
+  ],
+  "diagnosers": [
+    "rule_based",
+    "doctor_rag",
+    "llm_judge",
+    "propagation_aware",
+    "suffix_regen"
+  ],
+  "accuracy": {
+    "rule_based": {
+      "1": 0.0,
+      "2": 0.0,
+      "3": 0.0
+    },
+    "doctor_rag": {
+      "1": 1.0,
+      "2": 0.0,
+      "3": 0.0
+    },
+    "llm_judge": {
+      "1": 0.8461538461538461,
+      "2": 0.75,
+      "3": 0.0
+    },
+    "propagation_aware": {
+      "1": 1.0,
+      "2": 0.75,
+      "3": 0.0
+    },
+    "suffix_regen": {
+      "1": 0.9230769230769231,
+      "2": 0.0,
+      "3": 0.0
+    }
+  },
+  "cost": {
+    "rule_based": {
+      "1": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 13.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      },
+      "2": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 4.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      },
+      "3": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 0.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      }
+    },
+    "doctor_rag": {
+      "1": {
+        "total_cost": 0.0,
+        "n_correct": 13.0,
+        "n": 13.0,
+        "accuracy": 1.0,
+        "cost_per_correct": 0.0
+      },
+      "2": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 4.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      },
+      "3": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 0.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      }
+    },
+    "llm_judge": {
+      "1": {
+        "total_cost": 16550.0,
+        "n_correct": 11.0,
+        "n": 13.0,
+        "accuracy": 0.8461538461538461,
+        "cost_per_correct": 1504.5454545454545
+      },
+      "2": {
+        "total_cost": 7259.0,
+        "n_correct": 3.0,
+        "n": 4.0,
+        "accuracy": 0.75,
+        "cost_per_correct": 2419.6666666666665
+      },
+      "3": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 0.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      }
+    },
+    "propagation_aware": {
+      "1": {
+        "total_cost": 18026.0,
+        "n_correct": 13.0,
+        "n": 13.0,
+        "accuracy": 1.0,
+        "cost_per_correct": 1386.6153846153845
+      },
+      "2": {
+        "total_cost": 8089.0,
+        "n_correct": 3.0,
+        "n": 4.0,
+        "accuracy": 0.75,
+        "cost_per_correct": 2696.3333333333335
+      },
+      "3": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 0.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      }
+    },
+    "suffix_regen": {
+      "1": {
+        "total_cost": 23974.0,
+        "n_correct": 12.0,
+        "n": 13.0,
+        "accuracy": 0.9230769230769231,
+        "cost_per_correct": 1997.8333333333333
+      },
+      "2": {
+        "total_cost": 8120.0,
+        "n_correct": 0.0,
+        "n": 4.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      },
+      "3": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 0.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      }
+    }
+  },
+  "recovery_rate_by_depth": {
+    "1": 0.5357142857142857,
+    "2": 0.6363636363636364,
+    "3": 1.0
+  },
+  "n_total_by_depth": {
+    "1": 28,
+    "2": 11,
+    "3": 3
+  },
+  "n_failed_by_depth": {
+    "1": 13,
+    "2": 4,
+    "3": 0
+  },
+  "n_eligible_by_depth": {
+    "1": 28,
+    "2": 11,
+    "3": 3
+  },
+  "n_skipped_short_trace_by_depth": {
+    "1": 0,
+    "2": 24,
+    "3": 37
+  },
+  "n_skipped_base_incorrect_by_depth": {
+    "1": 12,
+    "2": 5,
+    "3": 0
+  },
+  "n_skipped_no_span_by_depth": {
+    "1": 0,
+    "2": 0,
+    "3": 0
+  },
+  "raw_by_depth": {
+    "1": {
+      "truth": [
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ]
+      ],
+      "predictions": {
+        "rule_based": [
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ]
+        ],
+        "doctor_rag": [
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ]
+        ],
+        "llm_judge": [
+          [
+            "answer_generation",
+            1,
+            1150
+          ],
+          [
+            "retrieval",
+            1,
+            1168
+          ],
+          [
+            "retrieval",
+            1,
+            1101
+          ],
+          [
+            "retrieval",
+            1,
+            2733
+          ],
+          [
+            "retrieval",
+            1,
+            1030
+          ],
+          [
+            "retrieval",
+            1,
+            1156
+          ],
+          [
+            "retrieval",
+            2,
+            2100
+          ],
+          [
+            "retrieval",
+            1,
+            1190
+          ],
+          [
+            "retrieval",
+            1,
+            904
+          ],
+          [
+            "none",
+            0,
+            1003
+          ],
+          [
+            "retrieval",
+            1,
+            1123
+          ],
+          [
+            "answer_generation",
+            1,
+            1080
+          ],
+          [
+            "retrieval",
+            1,
+            812
+          ]
+        ],
+        "propagation_aware": [
+          [
+            "retrieval",
+            1,
+            950
+          ],
+          [
+            "retrieval",
+            1,
+            1015
+          ],
+          [
+            "retrieval",
+            1,
+            911
+          ],
+          [
+            "retrieval",
+            1,
+            7497
+          ],
+          [
+            "retrieval",
+            1,
+            777
+          ],
+          [
+            "retrieval",
+            1,
+            894
+          ],
+          [
+            "retrieval",
+            1,
+            1079
+          ],
+          [
+            "retrieval",
+            1,
+            985
+          ],
+          [
+            "retrieval",
+            1,
+            720
+          ],
+          [
+            "retrieval",
+            1,
+            761
+          ],
+          [
+            "retrieval",
+            1,
+            918
+          ],
+          [
+            "retrieval",
+            1,
+            842
+          ],
+          [
+            "retrieval",
+            1,
+            677
+          ]
+        ],
+        "suffix_regen": [
+          [
+            "retrieval",
+            1,
+            929
+          ],
+          [
+            "retrieval",
+            1,
+            2339
+          ],
+          [
+            "retrieval",
+            1,
+            906
+          ],
+          [
+            "retrieval",
+            1,
+            10319
+          ],
+          [
+            "retrieval",
+            1,
+            772
+          ],
+          [
+            "retrieval",
+            1,
+            889
+          ],
+          [
+            "retrieval",
+            2,
+            2926
+          ],
+          [
+            "retrieval",
+            1,
+            981
+          ],
+          [
+            "retrieval",
+            1,
+            745
+          ],
+          [
+            "retrieval",
+            1,
+            757
+          ],
+          [
+            "retrieval",
+            1,
+            891
+          ],
+          [
+            "retrieval",
+            1,
+            838
+          ],
+          [
+            "retrieval",
+            1,
+            682
+          ]
+        ]
+      },
+      "metadata": [
+        {
+          "sample_id": "5a8c7595554299585d9e36b6",
+          "dataset": "hotpotqa",
+          "question": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+          "reference_answer": "Chief of Protocol",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Shirley Temple, who portrayed Corliss Archer in the film Kiss and Tell, held the government positions of United States ambassador to Ghana and to Czechoslovakia, and served as Chief of Protocol of the United States.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Shirley Temple held the government positions of United States ambassador to Ghana and to Czechoslovakia.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "Chief of Protocol",
+          "corrupted_span": "YG Entertainment",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a85ea095542994775f606a8",
+          "dataset": "hotpotqa",
+          "question": "What science fantasy young adult series, told in first person, has a set of companion books narrating the stories of enslaved worlds and alien species?",
+          "reference_answer": "Animorphs",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The science fantasy young adult series is 'Animorphs' by K.A. Applegate, which has companion books narrating the stories of enslaved worlds and alien species.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "The science fantasy young adult series is 'Letters to Cleo' by K. A. Applegate.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "Animorphs",
+          "corrupted_span": "Letters to Cleo",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "absorbed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5abd94525542992ac4f382d2",
+          "dataset": "hotpotqa",
+          "question": "2014 S/S is the debut album of a South Korean boy group that was formed by who?",
+          "reference_answer": "YG Entertainment",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The South Korean boy group that debuted with the album 2014 S/S was formed by YG Entertainment.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "2014 S/S is the debut album of the South Korean boy group WINNER, which was formed by Sonic.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "YG Entertainment",
+          "corrupted_span": "Sonic",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 2,
+          "n_replacements": 2,
+          "absorption": "absorbed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a85b2d95542997b5ce40028",
+          "dataset": "hotpotqa",
+          "question": "Who was known by his stage name Aladin and helped organizations improve their performance as a consultant?",
+          "reference_answer": "Eenasul Fateh",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Eenasul Fateh, known by his stage name Aladin, was a Bangladeshi-British cultural practitioner and former international management consultant who helped organizations improve their performance.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "James P. Comer was known by his stage name Aladin and helped organizations improve their performance as a consultant.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Maurice Falk Professor of Child Psychiatry",
+          "corrupted_span": "October 1922",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a877e5d5542993e715abf7d",
+          "dataset": "hotpotqa",
+          "question": "What screenwriter with credits for \"Evolution\" co-wrote a film starring Nicolas Cage and T\u00e9a Leoni?",
+          "reference_answer": "David Weissman",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "David Weissman co-wrote 'The Family Man,' which stars Nicolas Cage and T\u00e9a Leoni.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Eenasul Fateh co-wrote 'The Family Man,' which stars Nicolas Cage and T\u00e9a Leoni.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "David Weissman",
+          "corrupted_span": "Eenasul Fateh",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 2,
+          "n_replacements": 3,
+          "absorption": "absorbed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ab3b0bf5542992ade7c6e39",
+          "dataset": "hotpotqa",
+          "question": "What year did Guns N Roses perform a promo for a movie starring Arnold Schwarzenegger as a former New York Police detective?",
+          "reference_answer": "1999",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Guns N' Roses performed a promo for the movie starring Arnold Schwarzenegger as a former New York Police detective in 1999.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Guns N' Roses performed a promo for the movie 'Last Action Hero' starring Arnold Schwarzenegger in 2002.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "1999",
+          "corrupted_span": "2002",
+          "strategy": "answer_fact",
+          "replacement_kind": "numeric",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "absorbed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ab6d09255429954757d337d",
+          "dataset": "hotpotqa",
+          "question": "The football manager who recruited David Beckham managed Manchester United during what timeframe?",
+          "reference_answer": "from 1986 to 2013",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Alex Ferguson managed Manchester United from 1986 to 2013.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Alex Ferguson managed Manchester United during the timeframe of 1986 to 2013, when David Beckham was recruited into the team.",
+          "iterations_used": 3,
+          "hop": 1,
+          "original_span": "David Beckham's Soccer USA",
+          "corrupted_span": "Robert Erskine Childers DSC",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a75e05c55429976ec32bc5f",
+          "dataset": "hotpotqa",
+          "question": "Brown State Fishing Lake is in a country that has a population of how many inhabitants ?",
+          "reference_answer": "9,984",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The population of Brown County, Kansas, where Brown State Fishing Lake is located, was 9,984 as of the 2010 census.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "The population of Brown County, Kansas, where Brown State Fishing Lake is located, was 14,976 as of the 2010 census.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "9,984",
+          "corrupted_span": "14976",
+          "strategy": "answer_fact",
+          "replacement_kind": "numeric",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ab3e45655429976abd1bcd4",
+          "dataset": "hotpotqa",
+          "question": "The Vermont Catamounts men's soccer team currently competes in a conference that was formerly known as what from 1988 to 1996?",
+          "reference_answer": "the North Atlantic Conference",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "North Atlantic Conference",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "The conference was formerly known as the Eastern College Athletic Conference-North from 1988 to 1996.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "the North Atlantic Conference",
+          "corrupted_span": "yes",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a828c8355429966c78a6a50",
+          "dataset": "hotpotqa",
+          "question": "Kaiser Ventures corporation was founded by an American industrialist who became known as the father of modern American shipbuilding?",
+          "reference_answer": "Henry J. Kaiser",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Kaiser Ventures corporation was founded by Henry J. Kaiser, who became known as the father of modern American shipbuilding.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Kaiser Ventures corporation was founded by Henry John Kaiser, who is known as the father of modern American shipbuilding.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "Henry J. Kaiser",
+          "corrupted_span": "Greenwich Village, New York City",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 2,
+          "n_replacements": 2,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ac23ff0554299636651994d",
+          "dataset": "hotpotqa",
+          "question": "When was Poison's album \"Shut Up, Make Love\" released?",
+          "reference_answer": "2000",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Poison's album \"Shut Up, Make Love\" was released on March 14, 2000.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Poison's album \"Shut Up, Make Love\" was released on March 14, 1998.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "2000",
+          "corrupted_span": "1998",
+          "strategy": "answer_fact",
+          "replacement_kind": "numeric",
+          "n_docs_corrupted": 2,
+          "n_replacements": 5,
+          "absorption": "absorbed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ae4a3265542995ad6573de5",
+          "dataset": "hotpotqa",
+          "question": "Hayden is a singer-songwriter from Canada, but where does Buck-Tick hail from?",
+          "reference_answer": "Fujioka, Gunma",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Buck-Tick hails from Fujioka, Gunma, Japan.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Buck-Tick hails from Japan.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "Fujioka, Gunma",
+          "corrupted_span": "David Weissman",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 2,
+          "n_replacements": 2,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a80721b554299485f5985ef",
+          "dataset": "hotpotqa",
+          "question": "The Livesey Hal War Memorial commemorates the fallen of which war, that had over 60 million casualties?",
+          "reference_answer": "World War II",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The Livesey Hall War Memorial commemorates the fallen of World War I and World War II.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "The Livesey Hall War Memorial commemorates the fallen of World War I, which had over 60 million casualties.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "World War II",
+          "corrupted_span": "Letters to Cleo",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 2,
+          "n_replacements": 2,
+          "absorption": "derailed",
+          "query_contaminated": false
+        }
+      ],
+      "recovered_metadata": [
+        {
+          "sample_id": "5a8b57f25542995d1e6f1371",
+          "dataset": "hotpotqa",
+          "question": "Were Scott Derrickson and Ed Wood of the same nationality?",
+          "reference_answer": "yes",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Yes, both Scott Derrickson and Ed Wood are of American nationality.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Yes, both Scott Derrickson and Ed Wood were American.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Walt Disney Studios Motion Pictures",
+          "corrupted_span": "October 1922",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5adbf0a255429947ff17385a",
+          "dataset": "hotpotqa",
+          "question": "Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood?",
+          "reference_answer": "no",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "No, the Laleli Mosque is located in the Laleli neighborhood of Fatih, Istanbul, while the Esma Sultan Mansion is located in the Ortak\u00f6y neighborhood.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "No, the Laleli Mosque is located in the Laleli neighborhood of Fatih, Istanbul, while the Esma Sultan Mansion is located in the Ortak\u00f6y neighborhood of Istanbul.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "The Great Mosque of Algiers",
+          "corrupted_span": "3,677 seated",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a7bbb64554299042af8f7cc",
+          "dataset": "hotpotqa",
+          "question": "Who is older, Annie Morton or Terry Richardson?",
+          "reference_answer": "Terry Richardson",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Annie Morton is older than Terry Richardson. Annie was born on October 8, 1970, while Terry was born on August 14, 1965.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "{\"action\": \"search\", \"query\": \"What is Terry Richardson's date of birth?\"}",
+          "iterations_used": 3,
+          "hop": 1,
+          "original_span": "Terry Richardson",
+          "corrupted_span": "Henry J. Kaiser",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 3,
+          "n_replacements": 5,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a8db19d5542994ba4e3dd00",
+          "dataset": "hotpotqa",
+          "question": "Are Local H and For Against both from the United States?",
+          "reference_answer": "yes",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Yes, both Local H and For Against are from the United States.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Yes, both Local H and For Against are from the United States.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "National Register of Historic Places",
+          "corrupted_span": "Badly Drawn Boy",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a7166395542994082a3e814",
+          "dataset": "hotpotqa",
+          "question": "What is the name of the fight song of the university whose main campus is in Lawrence, Kansas and whose branch campuses are in the Kansas City metropolitan area?",
+          "reference_answer": "Kansas Song",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Kansas Song (We\u2019re From Kansas) is the fight song of the University of Kansas.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The fight song of the University of Kansas is called 'Kansas Song (We\u2019re From Kansas)'.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Missouri Department of Mental Health Behavioral Medicine",
+          "corrupted_span": "David Weissman",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ab29c24554299449642c932",
+          "dataset": "hotpotqa",
+          "question": "Are Giuseppe Verdi and Ambroise Thomas both Opera composers ?",
+          "reference_answer": "yes",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Yes, both Giuseppe Verdi and Ambroise Thomas are opera composers.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Yes, both Giuseppe Verdi and Ambroise Thomas are opera composers.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "The Life of Giuseppe Verdi",
+          "corrupted_span": "Sonic",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ae7a8175542993210983ed8",
+          "dataset": "hotpotqa",
+          "question": "Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?",
+          "reference_answer": "Pedro Rodr\u00edguez",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Pedro Rodr\u00edguez is the other Mexican Formula One race car driver who has held a podium besides Sergio P\u00e9rez.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Pedro Rodr\u00edguez is the other Mexican Formula One race car driver who has held the podium besides Sergio P\u00e9rez.",
+          "iterations_used": 3,
+          "hop": 1,
+          "original_span": "Pedro Rodr\u00edguez",
+          "corrupted_span": "from 1986 to 2013",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ae6050f55429929b0807a5e",
+          "dataset": "hotpotqa",
+          "question": "This singer of A Rather Blustery Day also voiced what hedgehog?",
+          "reference_answer": "Sonic",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Jim Cummings, the singer of 'A Rather Blustery Day,' also voiced Dr. Robotnik in 'Sonic the Hedgehog'.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The singer of 'A Rather Blustery Day', Jim Cummings, also voiced Dr. Robotnik from 'Sonic the Hedgehog', while Kate Higgins voiced Miles 'Tails' Prower.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Sonic",
+          "corrupted_span": "Pedro Rodr\u00edguez",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ae2070a5542994d89d5b313",
+          "dataset": "hotpotqa",
+          "question": "Which performance act has a higher instrument to person ratio, Badly Drawn Boy or Wolf Alice? ",
+          "reference_answer": "Badly Drawn Boy",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "{\"action\": \"search\", \"query\": \"What is the instrument to person ratio for Badly Drawn Boy?\"}",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "{\"action\": \"search\", \"query\": \"What is the number of instrumentalists Badly Drawn Boy and Wolf Alice have in their performances?\"}",
+          "iterations_used": 3,
+          "hop": 1,
+          "original_span": "Badly Drawn Boy",
+          "corrupted_span": "Robert Erskine Childers DSC",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 5,
+          "n_replacements": 9,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ae22b8d554299234fd0440f",
+          "dataset": "hotpotqa",
+          "question": "What was the father of Kasper Schmeichel voted to be by the IFFHS in 1992?",
+          "reference_answer": "World's Best Goalkeeper",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Peter Schmeichel was voted the IFFHS World's Best Goalkeeper in 1992.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Peter Schmeichel was voted the IFFHS World's Best Goalkeeper in 1992.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "World's Best Goalkeeper",
+          "corrupted_span": "YG Entertainment",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 2,
+          "n_replacements": 3,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5abd259d55429924427fcf1a",
+          "dataset": "hotpotqa",
+          "question": "Are both Dictyosperma, and Huernia described as a genus?",
+          "reference_answer": "yes",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Yes, both Dictyosperma and Huernia are described as genera.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Yes, both Dictyosperma and Huernia are described as genera.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "South African Cape",
+          "corrupted_span": "David Weissman",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a8a3e745542996c9b8d5e70",
+          "dataset": "hotpotqa",
+          "question": "What is the name for the adventure in \"Tunnels and Trolls\", a game designed by Ken St. Andre?",
+          "reference_answer": "Arena of Khazan",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Arena of Khazan",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Arena of Khazan",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Crusaders of Khazan",
+          "corrupted_span": "YG Entertainment",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a7cc50e554299452d57ba3e",
+          "dataset": "hotpotqa",
+          "question": "Which band, Letters to Cleo or Screaming Trees, had more members?",
+          "reference_answer": "Letters to Cleo",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Letters to Cleo had 6 members, while Screaming Trees had 4 core members (with some changes over time). Therefore, Letters to Cleo had more members.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Letters to Cleo had 6 members, while Screaming Trees had 3 main members.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Letters to Cleo",
+          "corrupted_span": "Henry J. Kaiser",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a8ef2a75542995a26add583",
+          "dataset": "hotpotqa",
+          "question": "Seven Brief Lessons on Physics was written by an Italian physicist that has worked in France since what year?",
+          "reference_answer": "2000",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Carlo Rovelli has worked in France since 2000.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Carlo Rovelli has worked in France since 2000.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Carlo Rovelli",
+          "corrupted_span": "Sonic",
+          "strategy": "bridge_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a7571135542992d0ec05f98",
+          "dataset": "hotpotqa",
+          "question": "Ralph Hefferline was a psychology professor at a university that is located in what city?",
+          "reference_answer": "New York City",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Ralph Hefferline was a psychology professor at Columbia University, which is located in New York City.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Ralph Hefferline was a psychology professor at Columbia University, which is located in New York City.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "New York City",
+          "corrupted_span": "World's Best Goalkeeper",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        }
+      ],
+      "requested_depth": 1,
+      "n_eligible": 28,
+      "n_skipped_short_trace": 0,
+      "n_skipped_base_incorrect": 12,
+      "n_skipped_no_span": 0,
+      "n_recovered": 15
+    },
+    "2": {
+      "truth": [
+        [
+          "retrieval",
+          2
+        ],
+        [
+          "retrieval",
+          2
+        ],
+        [
+          "retrieval",
+          2
+        ],
+        [
+          "retrieval",
+          2
+        ]
+      ],
+      "predictions": {
+        "rule_based": [
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ]
+        ],
+        "doctor_rag": [
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ]
+        ],
+        "llm_judge": [
+          [
+            "retrieval",
+            2,
+            1637
+          ],
+          [
+            "answer_generation",
+            2,
+            2043
+          ],
+          [
+            "retrieval",
+            2,
+            1673
+          ],
+          [
+            "answer_generation",
+            0,
+            1906
+          ]
+        ],
+        "propagation_aware": [
+          [
+            "retrieval",
+            2,
+            2353
+          ],
+          [
+            "retrieval",
+            2,
+            2425
+          ],
+          [
+            "retrieval",
+            2,
+            1989
+          ],
+          [
+            "retrieval",
+            1,
+            1322
+          ]
+        ],
+        "suffix_regen": [
+          [
+            "retrieval",
+            1,
+            1853
+          ],
+          [
+            "retrieval",
+            1,
+            2309
+          ],
+          [
+            "retrieval",
+            1,
+            1680
+          ],
+          [
+            "retrieval",
+            1,
+            2278
+          ]
+        ]
+      },
+      "metadata": [
+        {
+          "sample_id": "5a8e3ea95542995a26add48d",
+          "dataset": "hotpotqa",
+          "question": "The director of the romantic comedy \"Big Stone Gap\" is based in what New York city?",
+          "reference_answer": "Greenwich Village, New York City",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The director of the romantic comedy 'Big Stone Gap,' Adriana Trigiani, is based in Greenwich Village, New York City.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "The director of 'Big Stone Gap', Adriana Trigiani, is based in Kansas City.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Greenwich Village, New York City",
+          "corrupted_span": "Kansas Song",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a7166395542994082a3e814",
+          "dataset": "hotpotqa",
+          "question": "What is the name of the fight song of the university whose main campus is in Lawrence, Kansas and whose branch campuses are in the Kansas City metropolitan area?",
+          "reference_answer": "Kansas Song",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The fight song of the University of Kansas is called 'Kansas Song (We\u2019re From Kansas)'.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "We're From Kansas",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Kansas Song",
+          "corrupted_span": "Letters to Cleo",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a877e5d5542993e715abf7d",
+          "dataset": "hotpotqa",
+          "question": "What screenwriter with credits for \"Evolution\" co-wrote a film starring Nicolas Cage and T\u00e9a Leoni?",
+          "reference_answer": "David Weissman",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "David Weissman co-wrote the film 'The Family Man' starring Nicolas Cage and T\u00e9a Leoni.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Barton Lee Hazlewood co-wrote 'The Family Man,' a film starring Nicolas Cage and T\u00e9a Leoni.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "David Weissman",
+          "corrupted_span": "Barton Lee Hazlewood",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 2,
+          "n_replacements": 3,
+          "absorption": "absorbed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ab51dae5542991779162d82",
+          "dataset": "hotpotqa",
+          "question": "Are both Elko Regional Airport and Gerald R. Ford International Airport located in Michigan?",
+          "reference_answer": "no",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "No, Elko Regional Airport is located in Nevada, while Gerald R. Ford International Airport is located in Michigan.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Only Gerald R. Ford International Airport is located in Michigan; Elko Regional Airport is in Nevada.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "National Plan of Integrated Airport Systems",
+          "corrupted_span": "October 1922",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": false
+        }
+      ],
+      "recovered_metadata": [
+        {
+          "sample_id": "5a8b57f25542995d1e6f1371",
+          "dataset": "hotpotqa",
+          "question": "Were Scott Derrickson and Ed Wood of the same nationality?",
+          "reference_answer": "yes",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Yes, both Scott Derrickson and Ed Wood were American.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Yes, both Scott Derrickson and Ed Wood were American.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Conway Metropolitan Statistical Area",
+          "corrupted_span": "Greenwich Village, New York City",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a85ea095542994775f606a8",
+          "dataset": "hotpotqa",
+          "question": "What science fantasy young adult series, told in first person, has a set of companion books narrating the stories of enslaved worlds and alien species?",
+          "reference_answer": "Animorphs",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The science fantasy young adult series you are referring to is the 'Animorphs' series by K. A. Applegate, which includes companion books like 'The Hork-Bajir Chronicles' that narrate the stories of enslaved worlds and alien species.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The science fantasy young adult series is 'Animorphs', written by K.A. Applegate, which includes companion books narrating the stories of enslaved worlds and alien species.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Animorphs",
+          "corrupted_span": "yes",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 2,
+          "n_replacements": 3,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5adbf0a255429947ff17385a",
+          "dataset": "hotpotqa",
+          "question": "Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood?",
+          "reference_answer": "no",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "No, the Laleli Mosque is located in the Laleli neighborhood of Fatih, Istanbul, while the Esma Sultan Mansion is located in the Ortak\u00f6y neighborhood, which are different neighborhoods.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "No, the Laleli Mosque is located in Laleli, Fatih, Istanbul, while the Esma Sultan Mansion is located in the Ortak\u00f6y neighborhood of Istanbul.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "The Great Mosque of Algiers",
+          "corrupted_span": "Animorphs",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a7bbb64554299042af8f7cc",
+          "dataset": "hotpotqa",
+          "question": "Who is older, Annie Morton or Terry Richardson?",
+          "reference_answer": "Terry Richardson",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Annie Morton is older than Terry Richardson. Annie Morton was born on October 8, 1970, while Terry Richardson was born on August 14, 1965.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Annie Morton, born on October 8, 1970, is older than Terry Richardson, who was born on August 14, 1965.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Terry Richardson",
+          "corrupted_span": "Robert Erskine Childers DSC",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 5,
+          "n_replacements": 7,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ab29c24554299449642c932",
+          "dataset": "hotpotqa",
+          "question": "Are Giuseppe Verdi and Ambroise Thomas both Opera composers ?",
+          "reference_answer": "yes",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Yes, both Giuseppe Verdi and Ambroise Thomas are opera composers.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Yes, both Giuseppe Verdi and Ambroise Thomas are opera composers.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Giuseppe Fortunino Francesco Verdi",
+          "corrupted_span": "Barton Lee Hazlewood",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ae6050f55429929b0807a5e",
+          "dataset": "hotpotqa",
+          "question": "This singer of A Rather Blustery Day also voiced what hedgehog?",
+          "reference_answer": "Sonic",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Jim Cummings, who sang 'A Rather Blustery Day', also voiced the character Dr. Robotnik in 'Sonic the Hedgehog'.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The singer of 'A Rather Blustery Day', Jim Cummings, also voiced the character Dr. Robotnik in 'Sonic the Hedgehog'.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Sonic",
+          "corrupted_span": "Arena of Khazan",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 2,
+          "n_replacements": 2,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a7cc50e554299452d57ba3e",
+          "dataset": "hotpotqa",
+          "question": "Which band, Letters to Cleo or Screaming Trees, had more members?",
+          "reference_answer": "Letters to Cleo",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Letters to Cleo had more members than Screaming Trees.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Letters to Cleo had 6 members, while Screaming Trees had 4 members.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "The This Many Boyfriends Club",
+          "corrupted_span": "1969 until 1974",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        }
+      ],
+      "requested_depth": 2,
+      "n_eligible": 11,
+      "n_skipped_short_trace": 24,
+      "n_skipped_base_incorrect": 5,
+      "n_skipped_no_span": 0,
+      "n_recovered": 7
+    },
+    "3": {
+      "truth": [],
+      "predictions": {
+        "rule_based": [],
+        "doctor_rag": [],
+        "llm_judge": [],
+        "propagation_aware": [],
+        "suffix_regen": []
+      },
+      "metadata": [],
+      "recovered_metadata": [
+        {
+          "sample_id": "5a7bbb64554299042af8f7cc",
+          "dataset": "hotpotqa",
+          "question": "Who is older, Annie Morton or Terry Richardson?",
+          "reference_answer": "Terry Richardson",
+          "requested_depth": 3,
+          "actual_hop": 3,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Annie Morton is older than Terry Richardson. Annie was born on October 8, 1970, while Terry was born on August 14, 1965.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Annie Morton was born on October 8, 1970, while Terry Richardson was born on August 14, 1965. Therefore, Terry Richardson is older than Annie Morton.",
+          "iterations_used": 3,
+          "hop": 3,
+          "original_span": "Terry Richardson",
+          "corrupted_span": "Fujioka, Gunma",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 5,
+          "n_replacements": 7,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5ae2070a5542994d89d5b313",
+          "dataset": "hotpotqa",
+          "question": "Which performance act has a higher instrument to person ratio, Badly Drawn Boy or Wolf Alice? ",
+          "reference_answer": "Badly Drawn Boy",
+          "requested_depth": 3,
+          "actual_hop": 3,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "{\"action\": \"search\", \"query\": \"How many instruments does Badly Drawn Boy play live?\"}",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Badly Drawn Boy is a solo artist, while Wolf Alice is a four-piece band. Therefore, Badly Drawn Boy has a higher instrument to person ratio.",
+          "iterations_used": 3,
+          "hop": 3,
+          "original_span": "Badly Drawn Boy",
+          "corrupted_span": "New York City",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 5,
+          "n_replacements": 9,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "5a7cc50e554299452d57ba3e",
+          "dataset": "hotpotqa",
+          "question": "Which band, Letters to Cleo or Screaming Trees, had more members?",
+          "reference_answer": "Letters to Cleo",
+          "requested_depth": 3,
+          "actual_hop": 3,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Letters to Cleo had more members, with a total of six members mentioned, compared to Screaming Trees, which had fewer confirmed members.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Letters to Cleo had more members than Screaming Trees. Letters to Cleo had 6 members, whereas the number of members in Screaming Trees is not specified but can be inferred to be less than 6.",
+          "iterations_used": 3,
+          "hop": 3,
+          "original_span": "Letters to Cleo",
+          "corrupted_span": "World's Best Goalkeeper",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "resisted",
+          "query_contaminated": false
+        }
+      ],
+      "requested_depth": 3,
+      "n_eligible": 3,
+      "n_skipped_short_trace": 37,
+      "n_skipped_base_incorrect": 0,
+      "n_skipped_no_span": 0,
+      "n_recovered": 3
+    }
+  }
+}

@@ -1,0 +1,1558 @@
+{
+  "dataset": "musique",
+  "provider": "openai:gpt-4o-mini",
+  "retriever": "bm25",
+  "criterion": "hop",
+  "max_samples": 40,
+  "propagation_budget": null,
+  "strict_depth": true,
+  "require_base_correct": true,
+  "injection_methods": [
+    "inject_corrupted_evidence"
+  ],
+  "diagnosers_run": [
+    "rule_based",
+    "doctor_rag",
+    "llm_judge",
+    "propagation_aware",
+    "suffix_regen"
+  ],
+  "judge": "claude:claude-haiku-4-5",
+  "hops": [
+    1,
+    2,
+    3
+  ],
+  "diagnosers": [
+    "rule_based",
+    "doctor_rag",
+    "llm_judge",
+    "propagation_aware",
+    "suffix_regen"
+  ],
+  "accuracy": {
+    "rule_based": {
+      "1": 0.0,
+      "2": 0.0,
+      "3": 0.0
+    },
+    "doctor_rag": {
+      "1": 1.0,
+      "2": 0.0,
+      "3": 0.0
+    },
+    "llm_judge": {
+      "1": 0.42857142857142855,
+      "2": 0.8333333333333334,
+      "3": 0.0
+    },
+    "propagation_aware": {
+      "1": 0.8571428571428571,
+      "2": 0.5,
+      "3": 0.0
+    },
+    "suffix_regen": {
+      "1": 0.7142857142857143,
+      "2": 0.16666666666666666,
+      "3": 0.0
+    }
+  },
+  "cost": {
+    "rule_based": {
+      "1": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 7.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      },
+      "2": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 6.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      },
+      "3": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 0.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      }
+    },
+    "doctor_rag": {
+      "1": {
+        "total_cost": 0.0,
+        "n_correct": 7.0,
+        "n": 7.0,
+        "accuracy": 1.0,
+        "cost_per_correct": 0.0
+      },
+      "2": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 6.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      },
+      "3": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 0.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      }
+    },
+    "llm_judge": {
+      "1": {
+        "total_cost": 9185.0,
+        "n_correct": 3.0,
+        "n": 7.0,
+        "accuracy": 0.42857142857142855,
+        "cost_per_correct": 3061.6666666666665
+      },
+      "2": {
+        "total_cost": 10827.0,
+        "n_correct": 5.0,
+        "n": 6.0,
+        "accuracy": 0.8333333333333334,
+        "cost_per_correct": 2165.4
+      },
+      "3": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 0.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      }
+    },
+    "propagation_aware": {
+      "1": {
+        "total_cost": 13794.0,
+        "n_correct": 6.0,
+        "n": 7.0,
+        "accuracy": 0.8571428571428571,
+        "cost_per_correct": 2299.0
+      },
+      "2": {
+        "total_cost": 12486.0,
+        "n_correct": 3.0,
+        "n": 6.0,
+        "accuracy": 0.5,
+        "cost_per_correct": 4162.0
+      },
+      "3": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 0.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      }
+    },
+    "suffix_regen": {
+      "1": {
+        "total_cost": 15095.0,
+        "n_correct": 5.0,
+        "n": 7.0,
+        "accuracy": 0.7142857142857143,
+        "cost_per_correct": 3019.0
+      },
+      "2": {
+        "total_cost": 14356.0,
+        "n_correct": 1.0,
+        "n": 6.0,
+        "accuracy": 0.16666666666666666,
+        "cost_per_correct": 14356.0
+      },
+      "3": {
+        "total_cost": 0.0,
+        "n_correct": 0.0,
+        "n": 0.0,
+        "accuracy": 0.0,
+        "cost_per_correct": Infinity
+      }
+    }
+  },
+  "recovery_rate_by_depth": {
+    "1": 0.6111111111111112,
+    "2": 0.5,
+    "3": 1.0
+  },
+  "n_total_by_depth": {
+    "1": 18,
+    "2": 12,
+    "3": 2
+  },
+  "n_failed_by_depth": {
+    "1": 7,
+    "2": 6,
+    "3": 0
+  },
+  "n_eligible_by_depth": {
+    "1": 18,
+    "2": 12,
+    "3": 2
+  },
+  "n_skipped_short_trace_by_depth": {
+    "1": 0,
+    "2": 15,
+    "3": 25
+  },
+  "n_skipped_base_incorrect_by_depth": {
+    "1": 22,
+    "2": 13,
+    "3": 13
+  },
+  "n_skipped_no_span_by_depth": {
+    "1": 0,
+    "2": 0,
+    "3": 0
+  },
+  "raw_by_depth": {
+    "1": {
+      "truth": [
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ],
+        [
+          "retrieval",
+          1
+        ]
+      ],
+      "predictions": {
+        "rule_based": [
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ]
+        ],
+        "doctor_rag": [
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ]
+        ],
+        "llm_judge": [
+          [
+            "answer_generation",
+            1,
+            962
+          ],
+          [
+            "answer_generation",
+            0,
+            1793
+          ],
+          [
+            "answer_generation",
+            1,
+            792
+          ],
+          [
+            "answer_generation",
+            0,
+            1355
+          ],
+          [
+            "answer_generation",
+            0,
+            2252
+          ],
+          [
+            "retrieval",
+            1,
+            833
+          ],
+          [
+            "answer_generation",
+            2,
+            1198
+          ]
+        ],
+        "propagation_aware": [
+          [
+            "retrieval",
+            1,
+            683
+          ],
+          [
+            "retrieval",
+            3,
+            4199
+          ],
+          [
+            "retrieval",
+            1,
+            583
+          ],
+          [
+            "retrieval",
+            1,
+            1015
+          ],
+          [
+            "retrieval",
+            1,
+            4384
+          ],
+          [
+            "retrieval",
+            1,
+            669
+          ],
+          [
+            "retrieval",
+            1,
+            2261
+          ]
+        ],
+        "suffix_regen": [
+          [
+            "retrieval",
+            2,
+            1353
+          ],
+          [
+            "retrieval",
+            1,
+            6063
+          ],
+          [
+            "answer_generation",
+            0,
+            1151
+          ],
+          [
+            "retrieval",
+            1,
+            1011
+          ],
+          [
+            "retrieval",
+            1,
+            1940
+          ],
+          [
+            "retrieval",
+            1,
+            659
+          ],
+          [
+            "retrieval",
+            1,
+            2918
+          ]
+        ]
+      },
+      "metadata": [
+        {
+          "sample_id": "2hop__481349_302087",
+          "dataset": "musique",
+          "question": "Which company owns the manufacturer of Learjet 60?",
+          "reference_answer": "Bombardier Inc.",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The Learjet 60 is manufactured by Bombardier Aerospace, which is owned by Bombardier Inc.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "The Learjet 60 is manufactured by Bombardier Aerospace.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "Great Wall of China",
+          "corrupted_span": "Johanne Luise Heiberg",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__697790_864352",
+          "dataset": "musique",
+          "question": "Who is the child of Caroline LeRoy's spouse?",
+          "reference_answer": "Fletcher Webster",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The child of Caroline LeRoy's spouse, Daniel Webster, is Fletcher Webster.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Caroline LeRoy's spouse, Daniel Webster, and Caroline had a child named Marion Webster.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Caroline LeRoy Webster",
+          "corrupted_span": "Emilia Galotti",
+          "strategy": "bridge_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__635187_861533",
+          "dataset": "musique",
+          "question": "What province shares a border with the province where Lago District is located?",
+          "reference_answer": "Cabo Delgado Province",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Lago District is located in Niassa Province, which shares a border with Cabo Delgado Province in Mozambique.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Lago District is located in Niassa Province, which shares its border with Lichinga and Sanga District.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "Cabo Delgado Province",
+          "corrupted_span": "conga",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__698577_851686",
+          "dataset": "musique",
+          "question": "What is a notable work written by the author of The Timothy files?",
+          "reference_answer": "Anderson Tapes",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "A notable work written by the author of The Timothy Files is The Anderson Tapes.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "A notable work written by Lawrence Sanders, the author of The Timothy Files, is The Johanne Luise Heiberg.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "Anderson Tapes",
+          "corrupted_span": "Johanne Luise Heiberg",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "absorbed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__505860_650613",
+          "dataset": "musique",
+          "question": "Where was the author of Hannibal and Scipio educated at?",
+          "reference_answer": "Exeter College",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The author of Hannibal and Scipio, Thomas Nabbes, was educated at Exeter College, Oxford.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "{\"action\": \"search\", \"query\": \"Who is the author of Hannibal and Scipio?\"}",
+          "iterations_used": 3,
+          "hop": 1,
+          "original_span": "Thomas Nabbes",
+          "corrupted_span": "Keith Urban",
+          "strategy": "bridge_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": true
+        },
+        {
+          "sample_id": "2hop__647996_551681",
+          "dataset": "musique",
+          "question": "What is another notable work made by the author of Miss Sara Sampson?",
+          "reference_answer": "Emilia Galotti",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Another notable work by Gotthold Ephraim Lessing is 'Emilia Galotti.'",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Another notable work by Gotthold Ephraim Lessing is the play 'Cologne'.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "Emilia Galotti",
+          "corrupted_span": "Cologne",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "absorbed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__673655_316668",
+          "dataset": "musique",
+          "question": "What instrument is played by the person from The Blackout All-Stars?",
+          "reference_answer": "conga",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The instrument played by the person from The Blackout All-Stars is the conga, as Ray Barretto, a member of the group, is known for playing congas.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Sheila E. plays the drums in The Blackout All-Stars.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Ray Barretto",
+          "corrupted_span": "Lega Pro Prima Divisione",
+          "strategy": "bridge_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": false
+        }
+      ],
+      "recovered_metadata": [
+        {
+          "sample_id": "2hop__402530_774333",
+          "dataset": "musique",
+          "question": "What other county does the county where Imperial is located share a border with?",
+          "reference_answer": "Crockett County",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The county where Imperial is located, Pecos County, Texas, shares a border with Crockett County.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Imperial, Texas, located in Pecos County, shares a border with Crockett County.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Crockett County",
+          "corrupted_span": "Anderson Tapes",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__195917_575657",
+          "dataset": "musique",
+          "question": "In what county is William W. Blair's birthplace located?",
+          "reference_answer": "Orleans County",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "William W. Blair was born in Orleans County, New York.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "William W. Blair was born in Orleans County.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "National Register of Historic Places",
+          "corrupted_span": "Exeter College",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__528263_865831",
+          "dataset": "musique",
+          "question": "In which county is Kimbrough Memorial Stadium located?",
+          "reference_answer": "Randall County",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Kimbrough Memorial Stadium is located in Randall County, Texas.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Kimbrough Memorial Stadium is located in Randall County, Texas.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "Randall High School of Canyon Independent School District",
+          "corrupted_span": "Orleans County",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__569582_304416",
+          "dataset": "musique",
+          "question": "What record label is the performer of Almost Made Ya signed to?",
+          "reference_answer": "Derrty Entertainment",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The performer of 'Almost Made Ya,' Ali & Gipp, is signed to Derrty Entertainment and Universal Records.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The performer of 'Almost Made Ya,' Ali & Gipp, is signed to Derrty Entertainment and Universal Records.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Gipp",
+          "corrupted_span": "Derrty Entertainment",
+          "strategy": "bridge_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__554167_451128",
+          "dataset": "musique",
+          "question": "Who is the child of the Victim of Romance performer?",
+          "reference_answer": "Chynna Phillips",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Chynna Phillips is the child of the Victim of Romance performer, Michelle Phillips.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The child of the Victim of Romance performer, Michelle Phillips, is Chynna Phillips.",
+          "iterations_used": 3,
+          "hop": 1,
+          "original_span": "Michelle Phillips",
+          "corrupted_span": "Anderson Tapes",
+          "strategy": "bridge_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": true
+        },
+        {
+          "sample_id": "2hop__549146_223121",
+          "dataset": "musique",
+          "question": "What record label did the person who is part of The Bruce Lee Band start?",
+          "reference_answer": "Asian Man Records",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The person who is part of The Bruce Lee Band, Mike Park, started Asian Man Records.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The person who is part of The Bruce Lee Band, Mike Park, started Asian Man Records.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Mike Park",
+          "corrupted_span": "Cologne",
+          "strategy": "bridge_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__574419_270105",
+          "dataset": "musique",
+          "question": "What is the seat of the county where Van Hook Township is located?",
+          "reference_answer": "Stanley",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The seat of Mountrail County, where Van Hook Township is located, is Stanley, North Dakota.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The seat of Mountrail County, where Van Hook Township is located, is Stanley, North Dakota.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Mountrail County",
+          "corrupted_span": "Lega Pro Prima Divisione",
+          "strategy": "bridge_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__832795_350510",
+          "dataset": "musique",
+          "question": "What group was the performer of Be the One a member of?",
+          "reference_answer": "Jackson 5",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The performer of 'Be the One', Jackie Jackson, was a member of The Jackson 5.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The performer of 'Be the One' was Jackie Jackson, who was a member of The Jackson 5.",
+          "iterations_used": 3,
+          "hop": 1,
+          "original_span": "Jackie Jackson",
+          "corrupted_span": "Sir Francis Baring, 1st Baronet",
+          "strategy": "bridge_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__744055_408817",
+          "dataset": "musique",
+          "question": "Who is the lead singer of the band performing Bang Bang Rock & Roll?",
+          "reference_answer": "Eddie Argos",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Eddie Argos is the lead singer of the band performing Bang Bang Rock & Roll.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Eddie Argos is the lead singer of the band Art Brut, which performed Bang Bang Rock & Roll.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Art Brut",
+          "corrupted_span": "Johanne Luise Heiberg",
+          "strategy": "bridge_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": true
+        },
+        {
+          "sample_id": "2hop__726717_610238",
+          "dataset": "musique",
+          "question": "What is the network which National Cycle Route 57 is part of an example of?",
+          "reference_answer": "national cycling route network",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 1,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "National Cycle Route 57 is part of an example of a national cycling route network.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "National Cycle Route 57 is part of the United Kingdom's National Cycle Network, which is an example of a cycling infrastructure network.",
+          "iterations_used": 1,
+          "hop": 1,
+          "original_span": "national cycling route network",
+          "corrupted_span": "Cabo Delgado Province",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__341305_332933",
+          "dataset": "musique",
+          "question": "What is the capital of the county that Pine Springs is located in?",
+          "reference_answer": "Van Horn",
+          "requested_depth": 1,
+          "actual_hop": 1,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The capital of Culberson County, where Pine Springs is located, is Van Horn.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The capital of Culberson County, where Pine Springs is located, is Van Horn.",
+          "iterations_used": 2,
+          "hop": 1,
+          "original_span": "Van Horn",
+          "corrupted_span": "Lega Pro Prima Divisione",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        }
+      ],
+      "requested_depth": 1,
+      "n_eligible": 18,
+      "n_skipped_short_trace": 0,
+      "n_skipped_base_incorrect": 22,
+      "n_skipped_no_span": 0,
+      "n_recovered": 11
+    },
+    "2": {
+      "truth": [
+        [
+          "retrieval",
+          2
+        ],
+        [
+          "retrieval",
+          2
+        ],
+        [
+          "retrieval",
+          2
+        ],
+        [
+          "retrieval",
+          2
+        ],
+        [
+          "retrieval",
+          2
+        ],
+        [
+          "retrieval",
+          2
+        ]
+      ],
+      "predictions": {
+        "rule_based": [
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ],
+          [
+            "answer_generation",
+            0,
+            0
+          ]
+        ],
+        "doctor_rag": [
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ],
+          [
+            "retrieval",
+            1,
+            0
+          ]
+        ],
+        "llm_judge": [
+          [
+            "answer_generation",
+            2,
+            1368
+          ],
+          [
+            "answer_generation",
+            0,
+            1934
+          ],
+          [
+            "answer_generation",
+            2,
+            1903
+          ],
+          [
+            "retrieval",
+            2,
+            1916
+          ],
+          [
+            "retrieval",
+            2,
+            1734
+          ],
+          [
+            "retrieval",
+            2,
+            1972
+          ]
+        ],
+        "propagation_aware": [
+          [
+            "retrieval",
+            1,
+            2442
+          ],
+          [
+            "retrieval",
+            2,
+            2902
+          ],
+          [
+            "retrieval",
+            1,
+            1281
+          ],
+          [
+            "retrieval",
+            2,
+            2110
+          ],
+          [
+            "retrieval",
+            2,
+            2408
+          ],
+          [
+            "retrieval",
+            1,
+            1343
+          ]
+        ],
+        "suffix_regen": [
+          [
+            "retrieval",
+            2,
+            2073
+          ],
+          [
+            "retrieval",
+            1,
+            2017
+          ],
+          [
+            "retrieval",
+            1,
+            4754
+          ],
+          [
+            "retrieval",
+            1,
+            1980
+          ],
+          [
+            "retrieval",
+            1,
+            2006
+          ],
+          [
+            "retrieval",
+            1,
+            1526
+          ]
+        ]
+      },
+      "metadata": [
+        {
+          "sample_id": "2hop__252311_366220",
+          "dataset": "musique",
+          "question": "Who founded the company that distributed the film UHF?",
+          "reference_answer": "Mike Medavoy",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The film UHF was distributed by Orion Pictures, which was co-founded by Mike Medavoy.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "The company that distributed the film UHF is Orion Pictures.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Mike Medavoy",
+          "corrupted_span": "Time Warner Cable",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__698577_851686",
+          "dataset": "musique",
+          "question": "What is a notable work written by the author of The Timothy files?",
+          "reference_answer": "Anderson Tapes",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "A notable work written by the author of The Timothy Files is The Anderson Tapes.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "A notable work written by the author of The Timothy Files is The Marie de' Medici.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Anderson Tapes",
+          "corrupted_span": "Marie de' Medici",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "absorbed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__458131_174974",
+          "dataset": "musique",
+          "question": "Who is the spouse of the Rabbit Hole's producer?",
+          "reference_answer": "Keith Urban",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Nicole Kidman is the producer of Rabbit Hole, and her spouse is Keith Urban.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Nicole Kidman is the spouse of the producer of Rabbit Hole.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Toronto International Film Festival",
+          "corrupted_span": "Keith Urban",
+          "strategy": "salient_entity",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "derailed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__569582_304416",
+          "dataset": "musique",
+          "question": "What record label is the performer of Almost Made Ya signed to?",
+          "reference_answer": "Derrty Entertainment",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The performer of 'Almost Made Ya', Ali & Gipp, is signed to Derrty Entertainment and Universal Records.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Ali & Gipp, performers of 'Almost Made Ya', are signed to Knowsley and Universal Records.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Derrty Entertainment",
+          "corrupted_span": "Knowsley",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "absorbed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__505860_650613",
+          "dataset": "musique",
+          "question": "Where was the author of Hannibal and Scipio educated at?",
+          "reference_answer": "Exeter College",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The author of Hannibal and Scipio, Thomas Nabbes, was educated at Exeter College, Oxford.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "The author of Hannibal and Scipio, Thomas Nabbes, was educated at Anderson Tapes, Oxford.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Exeter College",
+          "corrupted_span": "Anderson Tapes",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "absorbed",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__647996_551681",
+          "dataset": "musique",
+          "question": "What is another notable work made by the author of Miss Sara Sampson?",
+          "reference_answer": "Emilia Galotti",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Another notable work by Gotthold Ephraim Lessing, the author of Miss Sara Sampson, is Emilia Galotti.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": false,
+          "recovered": false,
+          "final_answer": "Another notable work by Gotthold Ephraim Lessing is 'Nathan the Wise', a play that explores themes of religious tolerance and humanity.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Emilia Galotti",
+          "corrupted_span": "Asian Man Records",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "derailed",
+          "query_contaminated": false
+        }
+      ],
+      "recovered_metadata": [
+        {
+          "sample_id": "2hop__402530_774333",
+          "dataset": "musique",
+          "question": "What other county does the county where Imperial is located share a border with?",
+          "reference_answer": "Crockett County",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Imperial, Texas is located in Pecos County, which shares a border with Crockett County.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The county where Imperial is located, Pecos County, shares a border with Crockett County.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Crockett County",
+          "corrupted_span": "European integration",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__554167_451128",
+          "dataset": "musique",
+          "question": "Who is the child of the Victim of Romance performer?",
+          "reference_answer": "Chynna Phillips",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The child of the Victim of Romance performer, Michelle Phillips, is Chynna Phillips, who is one of the members of Wilson Phillips.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The child of the Victim of Romance performer, Michelle Phillips, is Chynna Phillips, who is a member of the group Wilson Phillips.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Chynna Phillips",
+          "corrupted_span": "Stanley",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__549146_223121",
+          "dataset": "musique",
+          "question": "What record label did the person who is part of The Bruce Lee Band start?",
+          "reference_answer": "Asian Man Records",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Mike Park, who is part of The Bruce Lee Band, started Asian Man Records.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Mike Park, who is part of The Bruce Lee Band, started the record label Asian Man Records.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Asian Man Records",
+          "corrupted_span": "Academy Award for Best Animated Short Film",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 2,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__574419_270105",
+          "dataset": "musique",
+          "question": "What is the seat of the county where Van Hook Township is located?",
+          "reference_answer": "Stanley",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The seat of Mountrail County, where Van Hook Township is located, is Stanley, North Dakota.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The seat of Mountrail County, where Van Hook Township is located, is Stanley.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Stanley",
+          "corrupted_span": "Orleans County",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__832795_350510",
+          "dataset": "musique",
+          "question": "What group was the performer of Be the One a member of?",
+          "reference_answer": "Jackson 5",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The performer of 'Be the One', Jackie Jackson, was a member of The Jackson 5.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The performer of 'Be the One,' Jackie Jackson, was a member of The Jackson 5.",
+          "iterations_used": 3,
+          "hop": 2,
+          "original_span": "Jackson 5",
+          "corrupted_span": "Asian Man Records",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__341305_332933",
+          "dataset": "musique",
+          "question": "What is the capital of the county that Pine Springs is located in?",
+          "reference_answer": "Van Horn",
+          "requested_depth": 2,
+          "actual_hop": 2,
+          "base_hop_count": 2,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The capital of Culberson County, where Pine Springs is located, is Van Horn, Texas.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The capital of Culberson County, where Pine Springs is located, is Van Horn, Texas.",
+          "iterations_used": 2,
+          "hop": 2,
+          "original_span": "Van Horn",
+          "corrupted_span": "Joan Erikson",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        }
+      ],
+      "requested_depth": 2,
+      "n_eligible": 12,
+      "n_skipped_short_trace": 15,
+      "n_skipped_base_incorrect": 13,
+      "n_skipped_no_span": 0,
+      "n_recovered": 6
+    },
+    "3": {
+      "truth": [],
+      "predictions": {
+        "rule_based": [],
+        "doctor_rag": [],
+        "llm_judge": [],
+        "propagation_aware": [],
+        "suffix_regen": []
+      },
+      "metadata": [],
+      "recovered_metadata": [
+        {
+          "sample_id": "2hop__402530_774333",
+          "dataset": "musique",
+          "question": "What other county does the county where Imperial is located share a border with?",
+          "reference_answer": "Crockett County",
+          "requested_depth": 3,
+          "actual_hop": 3,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "Pecos County shares a border with Crockett County.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "Imperial is located in Pecos County, Texas, which shares a border with Crockett County.",
+          "iterations_used": 3,
+          "hop": 3,
+          "original_span": "Crockett County",
+          "corrupted_span": "Bombardier Inc.",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        },
+        {
+          "sample_id": "2hop__499577_617190",
+          "dataset": "musique",
+          "question": "Who is the spouse of the child of Peter Andreas Heiberg?",
+          "reference_answer": "Johanne Luise Heiberg",
+          "requested_depth": 3,
+          "actual_hop": 3,
+          "base_hop_count": 3,
+          "declared_hop_count": 2,
+          "base_correct": true,
+          "base_answer": "The spouse of the child of Peter Andreas Heiberg is Johanne Luise Heiberg, who was married to Johan Ludvig Heiberg.",
+          "intervention_method": "inject_corrupted_evidence",
+          "injected_failure_type": "corrupted_evidence",
+          "injected_stage": "retrieval",
+          "final_correct": true,
+          "recovered": true,
+          "final_answer": "The spouse of the child of Peter Andreas Heiberg is Johanne Luise Heiberg.",
+          "iterations_used": 3,
+          "hop": 3,
+          "original_span": "Johanne Luise Heiberg",
+          "corrupted_span": "Mike Medavoy",
+          "strategy": "answer_fact",
+          "replacement_kind": "entity",
+          "n_docs_corrupted": 1,
+          "n_replacements": 1,
+          "absorption": "resisted",
+          "query_contaminated": false
+        }
+      ],
+      "requested_depth": 3,
+      "n_eligible": 2,
+      "n_skipped_short_trace": 25,
+      "n_skipped_base_incorrect": 13,
+      "n_skipped_no_span": 0,
+      "n_recovered": 2
+    }
+  }
+}

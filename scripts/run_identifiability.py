@@ -35,16 +35,23 @@ from agenticrag import (
     BM25Retriever,
     DenseRetriever,
     DoctorRAGDiagnoser,
+    LIVE_INJECTIONS,
     LLMAgent,
     LLMJudgeDiagnoser,
+    LiveFailureInjector,
     PropagationAwareDiagnoser,
     RuleBasedDiagnoser,
+    SuffixRegenerationDiagnoser,
     TokenOverlapRetriever,
+    corruption_absorption_rates,
     load_dataset,
     make_provider,
     run_identifiability,
 )
 from agenticrag.datasets import frames_corpus_stats
+
+DEFAULT_DIAGNOSERS = ["rule_based", "doctor_rag", "llm_judge", "propagation_aware"]
+ALL_DIAGNOSERS = DEFAULT_DIAGNOSERS + ["suffix_regen"]
 
 
 def _already_complete(out_path: str, hops, expected: dict | None = None) -> bool:
@@ -98,6 +105,21 @@ def main() -> None:
                    help="Inject into base traces even when the original answer is already wrong")
     p.add_argument("--propagation-budget", type=int, default=None,
                    help="Cap re-execution probes for the propagation-aware diagnoser")
+    p.add_argument("--injection-methods", nargs="+", default=None,
+                   choices=LIVE_INJECTIONS,
+                   help="Live interventions to run (default: the standard retrieval-"
+                        "corruption family). Use 'inject_corrupted_evidence' for the "
+                        "certified content-corruption arm.")
+    p.add_argument("--diagnosers", nargs="+", default=DEFAULT_DIAGNOSERS,
+                   choices=ALL_DIAGNOSERS,
+                   help="Diagnosers to evaluate. 'suffix_regen' is opt-in (expensive: "
+                        "it re-executes the suffix per probed hop).")
+    p.add_argument("--judge-provider", default=None,
+                   choices=["mock", "claude", "openai"],
+                   help="Provider for the LLM-judge diagnoser (default: same as --provider). "
+                        "Use a cross-family judge to control for self-diagnosis bias.")
+    p.add_argument("--judge-model", default=None,
+                   help="Model id for the LLM-judge diagnoser (default: --model)")
     p.add_argument("--tag", default="",
                    help="Suffix appended to the output filename (distinguish runs, "
                         "e.g. 'dense_b4' so a dense run doesn't overwrite a bm25 one)")
@@ -128,6 +150,8 @@ def main() -> None:
         "propagation_budget": args.propagation_budget,
         "strict_depth": not args.allow_short_depth_clamp,
         "require_base_correct": not args.include_base_failures,
+        "injection_methods": args.injection_methods,
+        "diagnosers_run": args.diagnosers,
     }
     if args.resume and _already_complete(out_path, args.hops, meta):
         print(f"[resume] {out_path} already covers hops {args.hops} — skipping.")
@@ -166,25 +190,54 @@ def main() -> None:
     print(f"Agent backbone: {provider.name} · retriever: {args.retriever}")
 
     # Build a separate judge provider so the judge doesn't share the agent's loop.
-    judge_provider = make_provider(args.provider, model=args.model)
-    diagnosers = {
-        "rule_based": RuleBasedDiagnoser(),
-        "doctor_rag": DoctorRAGDiagnoser(),
-        "llm_judge": LLMJudgeDiagnoser(provider=judge_provider),
-        "propagation_aware": PropagationAwareDiagnoser(agent, max_probes=args.propagation_budget),
+    # --judge-provider/--judge-model allow a cross-family judge (A8 control).
+    judge_provider = make_provider(
+        args.judge_provider or args.provider,
+        model=args.judge_model or (args.model if args.judge_provider is None else None),
+    )
+    meta["judge"] = judge_provider.name
+    available = {
+        "rule_based": lambda: RuleBasedDiagnoser(),
+        "doctor_rag": lambda: DoctorRAGDiagnoser(),
+        "llm_judge": lambda: LLMJudgeDiagnoser(provider=judge_provider),
+        "propagation_aware": lambda: PropagationAwareDiagnoser(
+            agent, max_probes=args.propagation_budget
+        ),
+        "suffix_regen": lambda: SuffixRegenerationDiagnoser(
+            agent, max_probes=args.propagation_budget
+        ),
     }
+    diagnosers = {name: available[name]() for name in args.diagnosers}
+
+    # In-domain distractor pool for certified content corruption: other samples'
+    # gold answers — natural, plausible, and guaranteed wrong for this sample.
+    injector = LiveFailureInjector(
+        agent, distractor_pool=[s.answer for s in samples if s.answer]
+    )
 
     print(f"Running identifiability sweep over hops={args.hops} "
           f"(checkpointing to {out_path} after each depth) ...")
     result = run_identifiability(
         agent, samples, diagnosers,
         hops=args.hops, criterion=args.criterion, hop_tolerance=args.hop_tolerance,
+        injection_methods=args.injection_methods, injector=injector,
         strict_depth=not args.allow_short_depth_clamp,
         require_base_correct=not args.include_base_failures,
         checkpoint_path=out_path, checkpoint_extra=meta, resume=args.resume,
     )
 
     _print_result(result, args)
+
+    absorption = corruption_absorption_rates(result.to_dict())
+    if absorption:
+        print("\nContent-corruption absorption (deterministic, certified spans):")
+        for depth in sorted(absorption):
+            r = absorption[depth]
+            print(
+                f"  hop{depth}: absorbed={r['absorbed']:.2f} "
+                f"resisted={r['resisted']:.2f} derailed={r['derailed']:.2f} "
+                f"(n={int(r['n'])})"
+            )
 
     with open(out_path, "w") as f:
         json.dump({**meta, **result.to_dict()}, f, indent=2)
@@ -216,10 +269,11 @@ def _print_result(result, args) -> None:
             f"{result.n_total_by_depth} / {result.n_failed_by_depth}[/dim]"
         )
         console.print(
-            f"[dim]eligible / skipped-short / skipped-base-wrong: "
+            f"[dim]eligible / skipped-short / skipped-base-wrong / skipped-no-span: "
             f"{result.n_eligible_by_depth} / "
             f"{result.n_skipped_short_trace_by_depth} / "
-            f"{result.n_skipped_base_incorrect_by_depth}[/dim]"
+            f"{result.n_skipped_base_incorrect_by_depth} / "
+            f"{result.n_skipped_no_span_by_depth}[/dim]"
         )
     except ImportError:
         print("\n=== RCA vs depth ===")
@@ -229,10 +283,11 @@ def _print_result(result, args) -> None:
         print(f"recovery_by_depth: {result.recovery_rate_by_depth}")
         print(f"n_total/n_failed: {result.n_total_by_depth} / {result.n_failed_by_depth}")
         print(
-            "eligible/skipped_short/skipped_base_wrong: "
+            "eligible/skipped_short/skipped_base_wrong/skipped_no_span: "
             f"{result.n_eligible_by_depth} / "
             f"{result.n_skipped_short_trace_by_depth} / "
-            f"{result.n_skipped_base_incorrect_by_depth}"
+            f"{result.n_skipped_base_incorrect_by_depth} / "
+            f"{result.n_skipped_no_span_by_depth}"
         )
 
 

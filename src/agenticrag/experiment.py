@@ -32,7 +32,9 @@ from .core import (
     FailureStage,
     PipelineTrace,
     _answer_correct,
+    _token_recall,
 )
+from .corruption import classify_absorption
 from .evaluate import (
     cost_per_correct_diagnosis,
     end_to_end_accuracy,
@@ -394,6 +396,9 @@ class IdentifiabilityResult:
     n_eligible_by_depth: Dict[int, int] = field(default_factory=dict)
     n_skipped_short_trace_by_depth: Dict[int, int] = field(default_factory=dict)
     n_skipped_base_incorrect_by_depth: Dict[int, int] = field(default_factory=dict)
+    # (method, depth) pairs skipped because no certifiable corruption span was
+    # found in the hop's docs (only inject_corrupted_evidence can skip this way).
+    n_skipped_no_span_by_depth: Dict[int, int] = field(default_factory=dict)
     # Per-depth raw diagnoses + ground truth, so accuracy can be re-scored under
     # a different criterion (stage / hop_tolerance) without re-spending tokens.
     # raw_by_depth[depth] = {"truth": [[stage, hop], ...],
@@ -423,6 +428,9 @@ class IdentifiabilityResult:
             },
             "n_skipped_base_incorrect_by_depth": {
                 str(k): v for k, v in self.n_skipped_base_incorrect_by_depth.items()
+            },
+            "n_skipped_no_span_by_depth": {
+                str(k): v for k, v in self.n_skipped_no_span_by_depth.items()
             },
             "raw_by_depth": {str(k): v for k, v in self.raw_by_depth.items()},
         }
@@ -497,6 +505,7 @@ def run_identifiability(
     n_eligible: Dict[int, int] = {}
     n_skipped_short_trace: Dict[int, int] = {}
     n_skipped_base_incorrect: Dict[int, int] = {}
+    n_skipped_no_span: Dict[int, int] = {}
     raw: Dict[int, Dict[str, Any]] = {}
 
     # Per-depth resume: preload depths already computed in a matching checkpoint,
@@ -505,6 +514,7 @@ def run_identifiability(
         checkpoint_path if resume else None, checkpoint_extra, names,
         accuracy, cost, recovery, n_total, n_failed, raw,
         n_eligible, n_skipped_short_trace, n_skipped_base_incorrect,
+        n_skipped_no_span,
     )
 
     def _snapshot() -> IdentifiabilityResult:
@@ -519,6 +529,7 @@ def run_identifiability(
             n_eligible_by_depth=n_eligible,
             n_skipped_short_trace_by_depth=n_skipped_short_trace,
             n_skipped_base_incorrect_by_depth=n_skipped_base_incorrect,
+            n_skipped_no_span_by_depth=n_skipped_no_span,
             raw_by_depth=raw,
         )
 
@@ -531,6 +542,7 @@ def run_identifiability(
         eligible_samples = 0
         skipped_short = 0
         skipped_base_wrong = 0
+        skipped_no_span = 0
         for s in samples:
             corpus = list(s.supporting_docs)
             if len(corpus) < min_corpus:
@@ -547,10 +559,15 @@ def run_identifiability(
             eligible_samples += 1
             for method in methods:
                 res = getattr(injector, method)(base, corpus, hop=depth)
+                if res is None:
+                    # No certifiable corruption span at this hop — skip rather
+                    # than inject an unverifiable fault.
+                    skipped_no_span += 1
+                    continue
                 injected.append(res)
                 refs.append({"answer": s.answer, "corpus": corpus})
                 final_correct = _answer_correct(res.injected_trace.final_answer, s.answer)
-                metadata.append({
+                case_meta: Dict[str, Any] = {
                     "sample_id": getattr(s, "sample_id", ""),
                     "dataset": getattr(s, "dataset", ""),
                     "question": getattr(s, "question", ""),
@@ -568,11 +585,28 @@ def run_identifiability(
                     "recovered": final_correct,
                     "final_answer": res.injected_trace.final_answer,
                     "iterations_used": res.injected_trace.iterations_used,
-                })
+                }
+                if res.corruption is not None:
+                    c = res.corruption
+                    corrupted_span = c.corrupted_span
+                    case_meta.update(c.to_dict())
+                    # Deterministic generation-level evaluation against the
+                    # certified spans — no LLM judge involved.
+                    case_meta["absorption"] = classify_absorption(
+                        res.injected_trace.final_answer, s.answer, corrupted_span
+                    )
+                    # Did the corrupted value leak into later sub-queries?
+                    # (Direct evidence of the propagation mechanism.)
+                    case_meta["query_contaminated"] = any(
+                        _token_recall(q, corrupted_span) >= 1.0
+                        for q in res.injected_trace.hop_queries[depth:]
+                    )
+                metadata.append(case_meta)
 
         n_eligible[depth] = eligible_samples
         n_skipped_short_trace[depth] = skipped_short
         n_skipped_base_incorrect[depth] = skipped_base_wrong
+        n_skipped_no_span[depth] = skipped_no_span
         n_total[depth] = len(injected)
         recovery[depth] = counterfactual_recovery_rate(injected, refs) if injected else 0.0
 
@@ -599,14 +633,24 @@ def run_identifiability(
                 diags, f_results, criterion=criterion, hop_tolerance=hop_tolerance
             )
             predictions[name] = [[d.stage.value, d.predicted_hop, d.cost_tokens] for d in diags]
+        # Recovered (injected-but-still-correct) cases carry no diagnosis but do
+        # carry the absorption label, so persist their metadata separately —
+        # absorption rates are then recomputable from the JSON at zero cost.
+        recovered_metadata = [
+            meta
+            for r, ref, meta in zip(injected, refs, metadata)
+            if _answer_correct(r.injected_trace.final_answer, ref["answer"])
+        ]
         raw[depth] = {
             "truth": truth,
             "predictions": predictions,
             "metadata": f_metadata,
+            "recovered_metadata": recovered_metadata,
             "requested_depth": depth,
             "n_eligible": eligible_samples,
             "n_skipped_short_trace": skipped_short,
             "n_skipped_base_incorrect": skipped_base_wrong,
+            "n_skipped_no_span": skipped_no_span,
             "n_recovered": len(injected) - len(failed),
         }
 
@@ -629,6 +673,7 @@ def _preload_checkpoint(
     n_eligible: Optional[Dict[int, int]] = None,
     n_skipped_short_trace: Optional[Dict[int, int]] = None,
     n_skipped_base_incorrect: Optional[Dict[int, int]] = None,
+    n_skipped_no_span: Optional[Dict[int, int]] = None,
 ) -> set:
     """Load already-computed depths from a *matching* checkpoint; return their set.
 
@@ -650,6 +695,7 @@ def _preload_checkpoint(
         "retriever",
         "strict_depth",
         "require_base_correct",
+        "injection_methods",
     ):
         if extra is not None and key in extra and prior.get(key) != extra.get(key):
             return set()  # config differs — do not reuse
@@ -674,6 +720,8 @@ def _preload_checkpoint(
         n_skipped_base_incorrect.update(
             _iload(prior.get("n_skipped_base_incorrect_by_depth", {}))
         )
+    if n_skipped_no_span is not None:
+        n_skipped_no_span.update(_iload(prior.get("n_skipped_no_span_by_depth", {})))
     return set(raw.keys())
 
 

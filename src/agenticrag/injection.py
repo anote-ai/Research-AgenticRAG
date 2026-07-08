@@ -5,6 +5,13 @@ from typing import Any, Dict, List, Optional
 
 from .agents import HopState, LLMAgent
 from .core import DiagnosticBenchmark, FailureStage, FailureType, PipelineTrace
+from .corruption import (
+    CorruptionRecord,
+    _stable_rng,
+    corrupt_docs,
+    make_replacement,
+    select_target_span,
+)
 
 
 @dataclass
@@ -16,6 +23,8 @@ class InjectionResult:
     injected_stage: FailureStage
     injected_failure_type: FailureType
     injected_at_hop: int  # 1-based; 0 = not hop-specific (answer-level)
+    # Certified content-corruption label (only set by inject_corrupted_evidence).
+    corruption: Optional[CorruptionRecord] = None
 
 
 class FailureInjector:
@@ -223,11 +232,17 @@ class LiveFailureInjector:
         noise_docs: Optional[List[str]] = None,
         false_premise: Optional[str] = None,
         stale_evidence: Optional[str] = None,
+        distractor_pool: Optional[List[str]] = None,
+        seed: int = 13,
     ) -> None:
         self.agent = agent
         self.noise_docs = list(noise_docs) if noise_docs else list(_LIVE_NOISE_DOCS)
         self.false_premise = false_premise or _DEFAULT_FALSE_PREMISE
         self.stale_evidence = stale_evidence or _DEFAULT_STALE_EVIDENCE
+        # In-domain wrong entities (typically other samples' gold answers) used
+        # as certified replacements by inject_corrupted_evidence.
+        self.distractor_pool = list(distractor_pool) if distractor_pool else []
+        self.seed = seed
 
     # -- helpers ------------------------------------------------------------ #
 
@@ -351,6 +366,67 @@ class LiveFailureInjector:
         prefix = hops[: hop - 1] + [HopState(query=q, docs=[stale or self.stale_evidence] + base_docs)]
         return self._resume(trace, corpus, prefix, hop, FailureType.STALE_EVIDENCE)
 
+    def inject_corrupted_evidence(
+        self,
+        trace: PipelineTrace,
+        corpus: List[str],
+        hop: int = 1,
+        distractor_pool: Optional[List[str]] = None,
+        seed: Optional[int] = None,
+    ) -> Optional[InjectionResult]:
+        """Flip the key fact inside *hop*'s docs, keeping them topically intact.
+
+        Unlike the structural interventions (empty / off-topic docs), the
+        corrupted docs still cover the question, so coverage-gated diagnosers
+        cannot detect the fault by construction — this is the hard,
+        deployment-realistic case (stale index, poisoned document).
+
+        The corruption is *certified*: the returned result carries a
+        :class:`~agenticrag.corruption.CorruptionRecord` naming exactly which
+        span changed and to what, enabling the deterministic
+        absorbed / resisted / derailed evaluation of the generated answer.
+
+        Returns None when the hop's docs contain no corruptible span (callers
+        should skip the sample — an uncertified corruption has no ground truth).
+        """
+        hops = self._hops(trace)
+        hop = self._clamp(hop, len(hops))
+        idx = hop - 1
+        docs = list(hops[idx].docs) if idx < len(hops) else []
+        later_queries = [h.query for h in hops[hop:]]
+        selected = select_target_span(
+            docs,
+            later_queries=later_queries,
+            question=trace.query,
+            reference_answer=trace.reference_answer,
+        )
+        if selected is None:
+            return None
+        span, strategy = selected
+
+        rng = _stable_rng(self.seed if seed is None else seed, trace.trace_id, hop)
+        replacement, kind = make_replacement(
+            span, rng,
+            distractor_pool=distractor_pool or self.distractor_pool,
+            avoid_texts=docs,
+        )
+        corrupted, n_docs, n_repl = corrupt_docs(docs, span, replacement)
+        if n_repl == 0:
+            return None
+
+        prefix = hops[: hop - 1] + [HopState(query=hops[idx].query, docs=corrupted)]
+        result = self._resume(trace, corpus, prefix, hop, FailureType.CORRUPTED_EVIDENCE)
+        result.corruption = CorruptionRecord(
+            hop=hop,
+            original_span=span,
+            corrupted_span=replacement,
+            strategy=strategy,
+            replacement_kind=kind,
+            n_docs_corrupted=n_docs,
+            n_replacements=n_repl,
+        )
+        return result
+
     def inject_early_termination(
         self, trace: PipelineTrace, corpus: List[str], hop: int = 1
     ) -> InjectionResult:
@@ -382,6 +458,7 @@ LIVE_INJECTIONS: List[str] = [
     "inject_query_drift",
     "inject_false_premise",
     "inject_stale_evidence",
+    "inject_corrupted_evidence",
     "inject_early_termination",
 ]
 

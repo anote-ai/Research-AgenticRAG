@@ -41,6 +41,7 @@ _STYLES = {
     # LLM-judge is promoted to an equal visual weight as Doctor-RAG (solid line, named marker).
     "llm_judge": dict(marker="^", linestyle="-", color="#ff7f0e", label="LLM-as-judge"),
     "propagation_aware": dict(marker="o", linestyle="-", color="#d62728", label="Propagation-aware (ours)"),
+    "suffix_regen": dict(marker="D", linestyle="-", color="#2ca02c", label="Suffix-regeneration (ours)"),
 }
 
 # Best post-hoc envelope line (element-wise max of doctor_rag, rule_based, llm_judge).
@@ -70,13 +71,42 @@ def _pa_vs_llm_delta(acc: dict, hops: list) -> list:
     return [round(pa.get(str(h), 0.0) - llm.get(str(h), 0.0), 3) for h in hops]
 
 
-def plot_one(result: dict, output_dir: str, show_best_posthoc: bool = True) -> None:
+def _strict_accuracy(result: dict) -> dict:
+    """Rescore accuracies from raw diagnoses with actual-depth filtering.
+
+    Pre-strict-fix result files have depth buckets contaminated by clamped
+    shallow interventions; the stored ``accuracy`` field reflects that
+    contamination. When raw diagnoses are persisted, recompute accuracy
+    keeping only cases whose actual injected hop equals the requested depth.
+    Returns {} when no raw data is available (caller falls back to stored).
+    """
+    if not result.get("raw_by_depth"):
+        return {}
+    from agenticrag.evaluate import rescore_identifiability
+
+    strict = rescore_identifiability(result, criterion="hop", require_actual_depth=True)
+    # Match the stored-accuracy shape: {diagnoser: {str(depth): acc}}, dropping
+    # depths whose strict bucket is empty (no cases at the requested depth).
+    ns = {
+        int(d): sum(1 for t in e.get("truth", []) if len(t) >= 2 and int(t[1]) == int(d))
+        for d, e in result["raw_by_depth"].items()
+    }
+    return {
+        name: {str(d): a for d, a in by_depth.items() if ns.get(int(d), 0) > 0}
+        for name, by_depth in strict.items()
+    }
+
+
+def plot_one(
+    result: dict, output_dir: str, show_best_posthoc: bool = True,
+    source_path: str = "", strict_rescore: bool = True,
+) -> None:
     import matplotlib.pyplot as plt
 
     prov = result.get("provider", "?")
     ds = result.get("dataset", "?")
     hops = result.get("hops", [])
-    acc = result.get("accuracy", {})
+    acc = (_strict_accuracy(result) if strict_rescore else {}) or result.get("accuracy", {})
     rec = result.get("recovery_rate_by_depth", {})
     nfail = result.get("n_failed_by_depth", {})
     if not hops or not acc:
@@ -86,12 +116,21 @@ def plot_one(result: dict, output_dir: str, show_best_posthoc: bool = True) -> N
     for name, style in _STYLES.items():
         if name not in acc:
             continue
-        ys = [acc[name].get(str(h), 0.0) for h in hops]
-        ax.plot(hops, ys, **style)
+        # Under strict rescoring a missing depth means the bucket is empty
+        # (no failed cases) — omit the point rather than plotting a false 0.
+        pts = [(h, acc[name][str(h)]) for h in hops if str(h) in acc[name]]
+        if not pts:
+            continue
+        xs, ys = zip(*pts)
+        ax.plot(xs, ys, **style)
 
-    if show_best_posthoc and any(n in acc for n in _POST_HOC_NAMES):
-        best_ys = _compute_best_posthoc(acc, hops)
-        ax.plot(hops, best_ys, **_BEST_POSTHOC_STYLE)
+    posthoc_hops = [
+        h for h in hops
+        if any(str(h) in acc.get(n, {}) for n in _POST_HOC_NAMES)
+    ]
+    if show_best_posthoc and posthoc_hops:
+        best_ys = _compute_best_posthoc(acc, posthoc_hops)
+        ax.plot(posthoc_hops, best_ys, **_BEST_POSTHOC_STYLE)
 
     ax.set_xlabel("Injection depth (hop)", fontsize=11)
     ax.set_ylabel("Root-cause attribution accuracy", fontsize=11)
@@ -110,7 +149,15 @@ def plot_one(result: dict, output_dir: str, show_best_posthoc: bool = True) -> N
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    base = os.path.join(output_dir, f"identifiability_curve_{_safe(prov)}_{ds}")
+    # Name the figure after the result file's stem so distinct runs on the same
+    # (provider, dataset) — bm25 vs dense_b4 vs bm25_corruption, or old-format
+    # files — never overwrite each other's figures.
+    if source_path:
+        stem = os.path.splitext(os.path.basename(source_path))[0]
+        stem = stem.replace("identifiability_", "", 1)
+    else:
+        stem = f"{_safe(prov)}_{ds}"
+    base = os.path.join(output_dir, f"identifiability_curve_{stem}")
     fig.savefig(base + ".pdf", bbox_inches="tight")
     fig.savefig(base + ".png", bbox_inches="tight", dpi=150)
     plt.close(fig)
@@ -125,6 +172,9 @@ def main() -> None:
                    help="Also plot the mock-backbone control curves")
     p.add_argument("--no-best-posthoc", action="store_true",
                    help="Omit the best-post-hoc envelope line")
+    p.add_argument("--no-strict-rescore", action="store_true",
+                   help="Plot the stored (loose) accuracies instead of strict "
+                        "actual-depth rescoring from raw diagnoses")
     args = p.parse_args()
 
     _check_deps()
@@ -140,7 +190,8 @@ def main() -> None:
         result = json.load(open(fp))
         if not args.include_mock and str(result.get("provider", "")).startswith("mock"):
             continue
-        plot_one(result, args.output_dir, show_best_posthoc=not args.no_best_posthoc)
+        plot_one(result, args.output_dir, show_best_posthoc=not args.no_best_posthoc,
+                 source_path=fp, strict_rescore=not args.no_strict_rescore)
         n += 1
     print(f"\nGenerated {n} identifiability figure(s) in {args.output_dir}/")
 
