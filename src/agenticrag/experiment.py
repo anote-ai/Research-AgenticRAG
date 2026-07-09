@@ -24,16 +24,18 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .core import (
     DiagnosticBenchmark,
     FailureRecord,
     FailureStage,
+    FailureType,
     PipelineTrace,
     _answer_correct,
     _token_recall,
 )
+from .corruption import CorruptionRecord
 from .corruption import classify_absorption
 from .evaluate import (
     cost_per_correct_diagnosis,
@@ -45,6 +47,13 @@ from .evaluate import (
 )
 from .injection import FailureInjector, InjectionResult, LiveFailureInjector
 from .propagation import counterfactual_recovery_rate
+
+
+@dataclass
+class _CachedDiagnosis:
+    stage: FailureStage
+    predicted_hop: int
+    cost_tokens: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -436,6 +445,134 @@ class IdentifiabilityResult:
         }
 
 
+def _cache_paths(checkpoint_path: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    if not checkpoint_path:
+        return None, None
+    return checkpoint_path + ".cases.jsonl", checkpoint_path + ".diagnoses.jsonl"
+
+
+def _json_signature(extra: Optional[Dict[str, Any]], exclude: Sequence[str] = ()) -> str:
+    payload = dict(extra or {})
+    for key in exclude:
+        payload.pop(key, None)
+    return json.dumps(payload, sort_keys=True, default=str)
+
+
+def _case_cache_signature(extra: Optional[Dict[str, Any]]) -> str:
+    return _json_signature(
+        extra,
+        exclude=("diagnosers_run", "judge", "injection_methods"),
+    )
+
+
+def _diagnosis_cache_signature(extra: Optional[Dict[str, Any]]) -> str:
+    return _json_signature(extra, exclude=("diagnosers_run",))
+
+
+def _append_jsonl(path: Optional[str], record: Dict[str, Any]) -> None:
+    if not path:
+        return
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(path, "a") as f:
+        json.dump(record, f, sort_keys=True)
+        f.write("\n")
+        f.flush()
+        os.fsync(f.fileno())
+
+
+def _load_jsonl(path: Optional[str], signature: str) -> List[Dict[str, Any]]:
+    if not path or not os.path.exists(path):
+        return []
+    records: List[Dict[str, Any]] = []
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if record.get("cache_signature") == signature:
+                    records.append(record)
+    except OSError:
+        return []
+    return records
+
+
+def _serialize_injection_result(result: InjectionResult) -> Dict[str, Any]:
+    return {
+        "original_trace_id": result.original_trace_id,
+        "injected_trace": result.injected_trace.model_dump(),
+        "injected_stage": result.injected_stage.value,
+        "injected_failure_type": result.injected_failure_type.value,
+        "injected_at_hop": result.injected_at_hop,
+        "corruption": result.corruption.to_dict() if result.corruption is not None else None,
+    }
+
+
+def _deserialize_injection_result(data: Dict[str, Any]) -> InjectionResult:
+    corruption_data = data.get("corruption")
+    corruption = CorruptionRecord(**corruption_data) if corruption_data else None
+    return InjectionResult(
+        original_trace_id=data["original_trace_id"],
+        injected_trace=PipelineTrace(**data["injected_trace"]),
+        injected_stage=FailureStage(data["injected_stage"]),
+        injected_failure_type=FailureType(data["injected_failure_type"]),
+        injected_at_hop=int(data["injected_at_hop"]),
+        corruption=corruption,
+    )
+
+
+def _load_case_cache(
+    path: Optional[str],
+    signature: str,
+) -> Tuple[Dict[Tuple[int, int], Dict[str, Any]], Dict[Tuple[int, int, str], Dict[str, Any]]]:
+    statuses: Dict[Tuple[int, int], Dict[str, Any]] = {}
+    cases: Dict[Tuple[int, int, str], Dict[str, Any]] = {}
+    for record in _load_jsonl(path, signature):
+        record_type = record.get("record_type")
+        depth = int(record.get("depth", 0))
+        sample_idx = int(record.get("sample_idx", -1))
+        if record_type == "sample_status":
+            statuses[(depth, sample_idx)] = record
+        elif record_type == "case":
+            method = str(record.get("method", ""))
+            cases[(depth, sample_idx, method)] = record
+    return statuses, cases
+
+
+def _load_diagnosis_cache(
+    path: Optional[str],
+    signature: str,
+) -> Dict[Tuple[int, int, str, str], List[Any]]:
+    out: Dict[Tuple[int, int, str, str], List[Any]] = {}
+    for record in _load_jsonl(path, signature):
+        if record.get("record_type") != "diagnosis":
+            continue
+        key = (
+            int(record.get("depth", 0)),
+            int(record.get("sample_idx", -1)),
+            str(record.get("method", "")),
+            str(record.get("diagnoser", "")),
+        )
+        prediction = record.get("prediction")
+        if isinstance(prediction, list) and len(prediction) >= 3:
+            out[key] = prediction
+    return out
+
+
+def _diagnosis_from_prediction(prediction: List[Any]) -> _CachedDiagnosis:
+    return _CachedDiagnosis(
+        stage=FailureStage(prediction[0]),
+        predicted_hop=int(prediction[1]),
+        cost_tokens=int(prediction[2]),
+    )
+
+
 def run_identifiability(
     agent: Any,
     samples: Sequence[Any],
@@ -516,6 +653,15 @@ def run_identifiability(
         n_eligible, n_skipped_short_trace, n_skipped_base_incorrect,
         n_skipped_no_span,
     )
+    case_cache_path, diagnosis_cache_path = _cache_paths(checkpoint_path)
+    case_sig = _case_cache_signature(checkpoint_extra)
+    diagnosis_sig = _diagnosis_cache_signature(checkpoint_extra)
+    cached_statuses: Dict[Tuple[int, int], Dict[str, Any]] = {}
+    cached_cases: Dict[Tuple[int, int, str], Dict[str, Any]] = {}
+    cached_diagnoses: Dict[Tuple[int, int, str, str], List[Any]] = {}
+    if resume:
+        cached_statuses, cached_cases = _load_case_cache(case_cache_path, case_sig)
+        cached_diagnoses = _load_diagnosis_cache(diagnosis_cache_path, diagnosis_sig)
 
     def _snapshot() -> IdentifiabilityResult:
         return IdentifiabilityResult(
@@ -543,64 +689,155 @@ def run_identifiability(
         skipped_short = 0
         skipped_base_wrong = 0
         skipped_no_span = 0
-        for s in samples:
+        for sample_idx, s in enumerate(samples):
             corpus = list(s.supporting_docs)
             if len(corpus) < min_corpus:
                 continue
-            base = agent.run(s.question, corpus, reference_answer=s.answer)
-            base_hops = len(base.hop_docs)
-            if strict_depth and base_hops < depth:
-                skipped_short += 1
-                continue
-            base_correct = _answer_correct(base.final_answer, s.answer)
-            if require_base_correct and not base_correct:
-                skipped_base_wrong += 1
-                continue
-            eligible_samples += 1
-            for method in methods:
-                res = getattr(injector, method)(base, corpus, hop=depth)
-                if res is None:
-                    # No certifiable corruption span at this hop — skip rather
-                    # than inject an unverifiable fault.
-                    skipped_no_span += 1
+            status_record = cached_statuses.get((depth, sample_idx))
+            base: Optional[PipelineTrace] = None
+            if status_record is not None:
+                status = status_record.get("status")
+                if status == "skipped_short":
+                    skipped_short += 1
                     continue
-                injected.append(res)
-                refs.append({"answer": s.answer, "corpus": corpus})
-                final_correct = _answer_correct(res.injected_trace.final_answer, s.answer)
-                case_meta: Dict[str, Any] = {
+                if status == "skipped_base_incorrect":
+                    skipped_base_wrong += 1
+                    continue
+                if status == "eligible":
+                    eligible_samples += 1
+                    base_dump = status_record.get("base_trace")
+                    base = PipelineTrace(**base_dump) if base_dump else None
+                    base_hops = int(status_record.get("base_hop_count", 0))
+                    base_correct = bool(status_record.get("base_correct", True))
+                else:
+                    status_record = None
+
+            if status_record is None:
+                base = agent.run(s.question, corpus, reference_answer=s.answer)
+                base_hops = len(base.hop_docs)
+                if strict_depth and base_hops < depth:
+                    skipped_short += 1
+                    _append_jsonl(case_cache_path, {
+                        "cache_signature": case_sig,
+                        "record_type": "sample_status",
+                        "depth": depth,
+                        "sample_idx": sample_idx,
+                        "sample_id": getattr(s, "sample_id", ""),
+                        "status": "skipped_short",
+                        "base_hop_count": base_hops,
+                    })
+                    continue
+                base_correct = _answer_correct(base.final_answer, s.answer)
+                if require_base_correct and not base_correct:
+                    skipped_base_wrong += 1
+                    _append_jsonl(case_cache_path, {
+                        "cache_signature": case_sig,
+                        "record_type": "sample_status",
+                        "depth": depth,
+                        "sample_idx": sample_idx,
+                        "sample_id": getattr(s, "sample_id", ""),
+                        "status": "skipped_base_incorrect",
+                        "base_hop_count": base_hops,
+                        "base_answer": base.final_answer,
+                    })
+                    continue
+                eligible_samples += 1
+                _append_jsonl(case_cache_path, {
+                    "cache_signature": case_sig,
+                    "record_type": "sample_status",
+                    "depth": depth,
+                    "sample_idx": sample_idx,
                     "sample_id": getattr(s, "sample_id", ""),
-                    "dataset": getattr(s, "dataset", ""),
-                    "question": getattr(s, "question", ""),
-                    "reference_answer": getattr(s, "answer", ""),
-                    "requested_depth": depth,
-                    "actual_hop": res.injected_at_hop,
+                    "status": "eligible",
                     "base_hop_count": base_hops,
-                    "declared_hop_count": getattr(s, "hop_count", None),
                     "base_correct": base_correct,
                     "base_answer": base.final_answer,
-                    "intervention_method": method,
-                    "injected_failure_type": res.injected_failure_type.value,
-                    "injected_stage": res.injected_stage.value,
-                    "final_correct": final_correct,
-                    "recovered": final_correct,
-                    "final_answer": res.injected_trace.final_answer,
-                    "iterations_used": res.injected_trace.iterations_used,
-                }
-                if res.corruption is not None:
-                    c = res.corruption
-                    corrupted_span = c.corrupted_span
-                    case_meta.update(c.to_dict())
-                    # Deterministic generation-level evaluation against the
-                    # certified spans — no LLM judge involved.
-                    case_meta["absorption"] = classify_absorption(
-                        res.injected_trace.final_answer, s.answer, corrupted_span
-                    )
-                    # Did the corrupted value leak into later sub-queries?
-                    # (Direct evidence of the propagation mechanism.)
-                    case_meta["query_contaminated"] = any(
-                        _token_recall(q, corrupted_span) >= 1.0
-                        for q in res.injected_trace.hop_queries[depth:]
-                    )
+                    "base_trace": base.model_dump(),
+                })
+
+            for method in methods:
+                case_record = cached_cases.get((depth, sample_idx, method))
+                if case_record is not None:
+                    if case_record.get("skipped_no_span"):
+                        skipped_no_span += 1
+                        continue
+                    res = _deserialize_injection_result(case_record["injection_result"])
+                    ref = case_record["ref"]
+                    case_meta = dict(case_record["metadata"])
+                else:
+                    if base is None:
+                        base_dump = status_record.get("base_trace") if status_record else None
+                        base = PipelineTrace(**base_dump) if base_dump else agent.run(
+                            s.question, corpus, reference_answer=s.answer
+                        )
+                        base_hops = len(base.hop_docs)
+                        base_correct = _answer_correct(base.final_answer, s.answer)
+                    res = getattr(injector, method)(base, corpus, hop=depth)
+                    if res is None:
+                        # No certifiable corruption span at this hop — skip rather
+                        # than inject an unverifiable fault.
+                        skipped_no_span += 1
+                        _append_jsonl(case_cache_path, {
+                            "cache_signature": case_sig,
+                            "record_type": "case",
+                            "depth": depth,
+                            "sample_idx": sample_idx,
+                            "sample_id": getattr(s, "sample_id", ""),
+                            "method": method,
+                            "skipped_no_span": True,
+                        })
+                        continue
+                    ref = {"answer": s.answer, "corpus": corpus}
+                    final_correct = _answer_correct(res.injected_trace.final_answer, s.answer)
+                    case_meta = {
+                        "sample_idx": sample_idx,
+                        "sample_id": getattr(s, "sample_id", ""),
+                        "dataset": getattr(s, "dataset", ""),
+                        "question": getattr(s, "question", ""),
+                        "reference_answer": getattr(s, "answer", ""),
+                        "requested_depth": depth,
+                        "actual_hop": res.injected_at_hop,
+                        "base_hop_count": base_hops,
+                        "declared_hop_count": getattr(s, "hop_count", None),
+                        "base_correct": base_correct,
+                        "base_answer": base.final_answer,
+                        "intervention_method": method,
+                        "injected_failure_type": res.injected_failure_type.value,
+                        "injected_stage": res.injected_stage.value,
+                        "final_correct": final_correct,
+                        "recovered": final_correct,
+                        "final_answer": res.injected_trace.final_answer,
+                        "iterations_used": res.injected_trace.iterations_used,
+                    }
+                    if res.corruption is not None:
+                        c = res.corruption
+                        corrupted_span = c.corrupted_span
+                        case_meta.update(c.to_dict())
+                        # Deterministic generation-level evaluation against the
+                        # certified spans — no LLM judge involved.
+                        case_meta["absorption"] = classify_absorption(
+                            res.injected_trace.final_answer, s.answer, corrupted_span
+                        )
+                        # Did the corrupted value leak into later sub-queries?
+                        # (Direct evidence of the propagation mechanism.)
+                        case_meta["query_contaminated"] = any(
+                            _token_recall(q, corrupted_span) >= 1.0
+                            for q in res.injected_trace.hop_queries[depth:]
+                        )
+                    _append_jsonl(case_cache_path, {
+                        "cache_signature": case_sig,
+                        "record_type": "case",
+                        "depth": depth,
+                        "sample_idx": sample_idx,
+                        "sample_id": getattr(s, "sample_id", ""),
+                        "method": method,
+                        "skipped_no_span": False,
+                        "ref": ref,
+                        "injection_result": _serialize_injection_result(res),
+                        "metadata": case_meta,
+                    })
+                injected.append(res)
+                refs.append(ref)
                 metadata.append(case_meta)
 
         n_eligible[depth] = eligible_samples
@@ -625,7 +862,32 @@ def run_identifiability(
         truth = [[r.injected_stage.value, r.injected_at_hop] for r in f_results]
         predictions: Dict[str, List[List[Any]]] = {}
         for name, diag in diagnosers.items():
-            diags = [diag.diagnose(r.injected_trace, ref) for r, ref in zip(f_results, f_refs)]
+            diags: List[Any] = []
+            for r, ref, meta in zip(f_results, f_refs, f_metadata):
+                cache_key = (
+                    depth,
+                    int(meta.get("sample_idx", -1)),
+                    str(meta.get("intervention_method", "")),
+                    name,
+                )
+                cached_prediction = cached_diagnoses.get(cache_key)
+                if cached_prediction is not None:
+                    diags.append(_diagnosis_from_prediction(cached_prediction))
+                    continue
+                d = diag.diagnose(r.injected_trace, ref)
+                prediction = [d.stage.value, d.predicted_hop, d.cost_tokens]
+                _append_jsonl(diagnosis_cache_path, {
+                    "cache_signature": diagnosis_sig,
+                    "record_type": "diagnosis",
+                    "depth": depth,
+                    "sample_idx": int(meta.get("sample_idx", -1)),
+                    "sample_id": meta.get("sample_id", ""),
+                    "method": meta.get("intervention_method", ""),
+                    "diagnoser": name,
+                    "prediction": prediction,
+                })
+                cached_diagnoses[cache_key] = prediction
+                diags.append(d)
             accuracy[name][depth] = localization_accuracy(
                 diags, f_results, criterion=criterion, hop_tolerance=hop_tolerance
             )

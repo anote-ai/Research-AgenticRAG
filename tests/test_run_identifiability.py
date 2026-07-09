@@ -187,3 +187,42 @@ class TestCheckpointing:
         )
         assert ckpt.exists()
         assert not (tmp_path / "ckpt.json.tmp").exists()
+
+    def test_resume_uses_case_and_diagnosis_cache_without_final_checkpoint(self, tmp_path):
+        agent = _agent()
+        ckpt = tmp_path / "ckpt.json"
+        first = run_identifiability(
+            agent, _samples(), _diagnosers(agent), hops=(1,),
+            checkpoint_path=str(ckpt),
+        )
+        assert first.n_total_by_depth[1] > 0
+        assert (tmp_path / "ckpt.json.cases.jsonl").exists()
+        assert (tmp_path / "ckpt.json.diagnoses.jsonl").exists()
+
+        # Simulate a crash before the main depth checkpoint survived. The JSONL
+        # caches should still let --resume rebuild the result without model calls.
+        ckpt.unlink()
+
+        class ExplodingAgent(type(agent)):
+            def run(self, *args, **kwargs):
+                raise AssertionError("cache miss: agent.run was called")
+
+            def resume_from_hops(self, *args, **kwargs):
+                raise AssertionError("cache miss: resume_from_hops was called")
+
+            def force_answer(self, *args, **kwargs):
+                raise AssertionError("cache miss: force_answer was called")
+
+            def _retrieve(self, *args, **kwargs):
+                raise AssertionError("cache miss: _retrieve was called")
+
+        exploding = ExplodingAgent(
+            provider=MockProvider(), retriever=TokenOverlapRetriever(), max_iterations=3
+        )
+        resumed = run_identifiability(
+            exploding, _samples(), _diagnosers(exploding), hops=(1,),
+            checkpoint_path=str(ckpt), resume=True,
+        )
+        assert resumed.n_total_by_depth == first.n_total_by_depth
+        assert resumed.n_failed_by_depth == first.n_failed_by_depth
+        assert resumed.raw_by_depth[1]["truth"] == first.raw_by_depth[1]["truth"]

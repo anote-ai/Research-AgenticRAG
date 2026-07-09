@@ -93,6 +93,18 @@ intervention type, base/final answers). Use `--allow-short-depth-clamp` or
 `--include-base-failures` only when intentionally reproducing older exploratory
 runs.
 
+Long real-backbone runs are resumable. In addition to the final result JSON,
+`scripts/run_identifiability.py --resume` writes per-case caches next to the
+output file:
+
+- `<result>.cases.jsonl` stores base eligibility decisions and injected traces.
+- `<result>.diagnoses.jsonl` stores per-diagnoser predictions for failed cases.
+
+If a run drops halfway through a depth, re-run the exact same command with
+`--resume`; completed depths load from the JSON checkpoint, and partially
+completed depths reuse these JSONL caches instead of regenerating finished
+cases or diagnoses.
+
 ## Benchmark Stats Template
 
 | Metric                      | Value  |
